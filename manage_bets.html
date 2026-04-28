@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>PolyFriends - ניהול</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="function.js"></script>
+</head>
+<body>
+    <nav id="main-nav"></nav>
+
+    <h1 id="main-title">יצירת התערבות חדשה</h1>
+
+    <div class="standalone-form">
+        <div class="market-card">
+            <form id="createBetForm" onsubmit="createBet(event)">
+                <input type="text" id="betTitle" placeholder="כותרת ההימור" required>
+                <select id="categorySelect" required onchange="checkCustomCat()"></select>
+                <div id="customCategoryWrapper" class="hidden">
+                    <input type="text" id="customCategory" placeholder="הזן קטגוריה חדשה">
+                </div>
+                <div class="bet-options-wrapper">
+                    <input type="text" id="betOption1" placeholder="אופציה א' (למשל: טראמפ)" required>
+                    <input type="text" id="betOption2" placeholder="אופציה ב' (למשל: ביידן)" required>
+                </div>
+                <input type="number" id="betAmount" placeholder="סכום השתתפות" required min="1">
+                <button type="submit" class="auth-btn modal-submit-btn" id="createBetBtn">צור התערבות חדשה</button>
+            </form>
+        </div>
+    </div>
+
+    <h1 class="section-title">ההתערבויות שפתחתי</h1>
+    <div id="my-open-bets" class="content-container"></div>
+    <footer id="main-footer"></footer>
+</body>
+</html>

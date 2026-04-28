@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>PolyFriends - התערבויות</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="function.js"></script>
+</head>
+<body>
+    <nav id="main-nav"></nav>
+
+    <h1 id="main-title">רשימת ההתערבויות</h1>
+    
+    <div style="text-align: center; margin-bottom: 20px;">
+        <select id="statusFilter" onchange="renderMarkets()" style="padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; min-width: 200px;">
+            <option value="open">התערבויות פתוחות</option>
+            <option value="closed">התערבויות סגורות</option>
+            <option value="all">כל ההתערבויות</option>
+        </select>
+    </div>
+
+    <div class="gallery-container" id="markets-container"></div>
+    <footer id="main-footer"></footer>
+</body>
+</html>

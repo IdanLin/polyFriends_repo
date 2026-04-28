@@ -1,0 +1,53 @@
+{
+  "users": [
+    {"username": "admin", "password": "123", "fullName": "מנהל מערכת", "balance": 0},
+    {"username": "idan", "password": "123", "fullName": "עידן", "balance": 0}
+  ],
+  "categories": ["פוליטיקה", "ספורט", "קריפטו", "תרבות פופ", "כלכלה", "מדע וטכנולוגיה"],
+  "bets": [
+    {
+      "id": "bet_1",
+      "title": "מי ינצח בבחירות הקרובות בארה\"ב?",
+      "amount": 100,
+      "category": "פוליטיקה",
+      "creator": "admin",
+      "status": "open",
+      "options": ["טראמפ", "ביידן"],
+      "participants": {
+         "idan": "טראמפ"
+      },
+      "winningOption": null
+    },
+    {
+      "id": "bet_2",
+      "title": "האם הביטקוין יחצה את ה-$100K השנה?",
+      "amount": 50,
+      "category": "קריפטו",
+      "creator": "idan",
+      "status": "open",
+      "options": ["כן", "לא"],
+      "participants": {},
+      "winningOption": null
+    }
+  ],
+  "admins": [
+    {
+      "name": "עידן",
+      "role": "מייסד ומפתח",
+      "bio": "מפתח פול-סטאק, חובב טכנולוגיה, קריפטו, וספורט. אחראי על ניהול השרתים וה-DB.",
+      "image": "https://ui-avatars.com/api/?name=Idan&background=0D8ABC&color=fff"
+    },
+    {
+      "name": "ישראל ישראלי",
+      "role": "מעצב UI/UX",
+      "bio": "מעצב ממשק משתמש ומומחה לחוויית משתמש. אחראי על עיצוב המערכת והנראות.",
+      "image": "https://ui-avatars.com/api/?name=Yisrael&background=random"
+    },
+    {
+      "name": "גיל",
+      "role": "מפתח צד-לקוח",
+      "bio": "מתכנת צד לקוח שאוהב לפתור בעיות מורכבות, לחקור כלי פיתוח חדשים ולהנות מקפה טוב.",
+      "image": "https://ui-avatars.com/api/?name=G&background=random"
+    }
+  ]
+}

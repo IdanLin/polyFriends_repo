@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>PolyFriends - גיא סהר</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="function.js"></script>
+</head>
+<body>
+    <nav id="main-nav"></nav>
+
+    <div class="personal-profile">
+        <img src="images\GuySahar.png" alt="Guy Sahar">
+        <h1>גיא סהר</h1>
+        <div class="role">CTO</div>
+        <p class="bio">
+גיא הוא אחד ממייסדי PolyFriends, פלטפורמה חברתית שנועדה לנהל התערבויות חבריות בצורה פשוטה, מסודרת ומהנה. האפליקציה מאפשרת לקבוצות חברים ליצור, לעקוב ולסגור התערבויות באופן שקוף ואינטואיטיבי - החל מחיזויי ספורט ועד אתגרים יומיומיים ומטרות אישיות. במסגרת תפקידו הוא עוסק בהובלת חזון המוצר, חוויית המשתמש ופיתוח המערכת, תוך שילוב בין אינטראקציה חברתית לתחרות קלילה ומהנה.        </p>
+        
+        <button onclick="toggleDetails()" id="toggleBtn" class="auth-btn" style="margin-bottom: 15px; cursor: pointer;">הצג פרטים</button>
+        
+        <div class="contact-info" id="contactDetails" style="display: none;">
+            <a href="tel:054-6965652" class="contact-link">
+                <span>📞</span> 054-6965652
+            </a>
+            <a href="mailto:sahar.guy@gmail.com" class="contact-link">
+                <span>✉️</span> sahar.guy@gmail.com
+            </a>
+        </div>
+    </div>
+
+    <footer id="main-footer"></footer>
+
+    <script> //this script is in this file because we need it for HW1 JS in the team member page 
+        function toggleDetails() {
+            const details = document.getElementById('contactDetails');
+            const btn = document.getElementById('toggleBtn');
+            if (details.style.display === 'none') {
+                details.style.display = 'flex';
+                btn.innerText = 'הסתר פרטים';
+            } else {
+                details.style.display = 'none';
+                btn.innerText = 'הצג פרטים';
+            }
+        }
+    </script>
+</body>
+</html>
