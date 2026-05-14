@@ -2,6 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PolyFriends - מחשבון</title>
     <link rel="stylesheet" href="style.css">
     <script src="function.js"></script>
@@ -9,18 +10,18 @@
 <body>
     <nav id="main-nav"></nav>
 
-    <h1 id="main-title">מחשבון חלוקת זכיות (חישוב מקומי)</h1>
+    <h1>מחשבון חלוקת זכיות (חישוב מקומי)</h1>
 
     <div class="standalone-form">
         <div class="market-card">
             <form id="calcForm">
                 <input type="number" id="pool_amount" placeholder="הכנס קופה כוללת" required>
-                <button type="button" class="auth-btn modal-submit-btn" onclick="calculatePayout()">חשב פוטנציאל זכייה נטו</button>
+                <button type="button" onclick="calculatePayout()">חשב פוטנציאל זכייה נטו</button>
             </form>
         </div>
     
         <div class="market-card">
-            <h3 style="margin-top: 0;">תוצאת החישוב:</h3>
+            <h3>תוצאת החישוב:</h3>
             <p id="calcResult" style="font-weight: bold; color: #2ecc71; font-size: 1.1em;"></p>
         </div>
     </div>

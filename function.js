@@ -56,11 +56,11 @@ function buildNav() {
 
     let categoriesLinks = appData.categories.map(c => `<a href="markets.html?cat=${encodeURIComponent(c)}">${c}</a>`).join('');
 
-    let isHomeOrMarkets = ['index.html', 'markets.html'].some(p => window.location.pathname.includes(p)) || window.location.pathname.endsWith('/');
+    let isMarkets = ['markets.html'].some(p => window.location.pathname.includes(p)) || window.location.pathname.endsWith('/');
     let currentStatus = new URLSearchParams(window.location.search).get('status') || 'open';
     
-    let navTopicsHtml = isHomeOrMarkets ? `
-        <div class="nav-topics" style="align-items: center;">
+    let navTopicsHtml = isMarkets ? `
+        <div class="nav-topics">
             <div class="toggle-switch">
                 <input type="radio" id="nav-open" name="nav-status" value="open" onchange="changeStatusFilter('open')" ${currentStatus !== 'closed' ? 'checked' : ''}>
                 <label for="nav-open">פתוחות</label>
@@ -80,7 +80,7 @@ function buildNav() {
             <a href="index.html" class="logo"><img src="images/logo.svg" alt="PolyFriends Logo"> PolyFriends</a>
             <div class="desktop-nav-links">
                 <div class="dropdown-hover">
-                    <a href="markets.html">התערבויות פתוחות ▾</a>
+                    <a href="markets.html">התערבויות▾</a>
                     <div class="dropdown-content">${categoriesLinks}</div>
                 </div>
                 <a href="manage_bets.html">ניהול הימורים</a>
@@ -283,11 +283,11 @@ window.renderMarkets = function() {
         <div class="bet-card">
             <div>
                 <h3>${bet.title}</h3>
-                <div class="category">${bet.category}</div>
-                <p style="color:#555;">סכום השתתפות: ₪${bet.amount}</p>
+                <h4>${bet.category}</h4>
+                <p>סכום השתתפות: ₪${bet.amount}</p>
             </div>
             <div>
-                <div class="stats" style="margin-bottom:10px;"><span>קופה נוכחית: ₪${potAmount}</span></div>
+                <h4>קופה נוכחית: ₪${potAmount}</h4>
                 ${buttonsHtml}
             </div>
         </div>`;
@@ -320,12 +320,13 @@ window.renderManageBets = function() {
     
     let myOpenBets = appData.bets.filter(b => b.creator === currentUser.username && b.status === 'open');
     if(myOpenBets.length === 0) {
-        closedBetsContainer.innerHTML = '<p>אין לך הימורים פתוחים לסגירה.</p>';
+        closedBetsContainer.innerHTML = '<p style="text-align:center; width:100%;">אין לך הימורים פתוחים לסגירה.</p>';
     } else {
         closedBetsContainer.innerHTML = myOpenBets.map(bet => `
-            <div class="market-card">
-                <div><strong>${bet.title}</strong> (קופה: ₪${Object.keys(bet.participants).length * bet.amount})</div>
-                <button class="auth-btn btn-unselected" onclick="closeBet('${bet.id}')">סגור התערבות</button>
+            <div class="market-card" style="text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+                <h3 style="margin-top: 0; margin-bottom: 10px;">${bet.title}</h3>
+                <p style="color: #555; margin-bottom: 15px;">קופה: ₪${Object.keys(bet.participants).length * bet.amount}</p>
+                <button onclick="closeBet('${bet.id}')">סגור התערבות</button>
             </div>
         `).join('');
     }
@@ -474,26 +475,26 @@ window.renderLedger = function() {
                         settleBtn = `<button onclick="settleDebt('${otherUser}', ${displayAmount})" style="font-size:0.75em; padding:3px 8px; margin-right:8px; background:#2196F3; color:white; border:none; border-radius:4px; cursor:pointer;">קבלת תשלום</button>`;
                     }
                     debtRows += `
-                        <div style="display: flex; justify-content: space-between; font-size: 0.9em; margin-bottom: 5px; padding: 4px 0; border-bottom: 1px dashed #f0f0f0; align-items:center;">
-                            <div style="display:flex; align-items:center;"><span>${otherName}</span>${settleBtn}</div>
+                        <div class="debt-row">
+                            <div class="debt-user"><span>${otherName}</span>${settleBtn}</div>
                             <span style="color: ${color}; font-weight: bold; direction: ltr;">${amountSign}${displayAmount} ₪</span>
                         </div>`;
                 }
             }
             if (debtRows) {
                 debtsHtml = `
-                    <div style="margin-top: 15px; text-align: right; border-top: 1px solid #eaeaea; padding-top: 10px;">
-                        <h4 style="margin: 0 0 10px 0; font-size: 0.95em; color: #333;">מאזן מול משתתפים:</h4>
+                    <div class="debts-wrapper">
+                        <h4>מאזן מול משתתפים:</h4>
                         ${debtRows}
                     </div>`;
             }
         }
         
         return `
-            <div class="profile-card">
+            <div>
                 <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName)}&background=random&color=fff">
                 <h3>${user.fullName}</h3>
-                <p style="color:#888;">@${user.username}</p>
+                <h4>@${user.username}</h4>
                 <div class="balance-badge ${bClass}">סך הכל: ${sign}${displayBalance} ₪</div>
                 ${debtsHtml}
             </div>`;
@@ -535,11 +536,11 @@ window.renderContact = function() {
     const container = document.getElementById('admins-container');
     if(container) {
         container.innerHTML = appData.admins.map(admin => `
-            <div class="profile-card">
+            <div>
                 <img src="${admin.image}">
                 <h3>${admin.name}</h3>
-                <p style="color:#2196F3; font-weight:bold;">${admin.role}</p>
-                <p style="font-size:0.9em; color:#555;">${admin.bio}</p>
+                <h4>${admin.role}</h4>
+                <p>${admin.bio}</p>
             </div>
         `).join('');
     }
@@ -550,10 +551,10 @@ function renderTeamPage() {
     const container = document.getElementById('team-container');
     if(container) {
         container.innerHTML = appData.admins.map(admin => `
-            <div class="profile-card">
+            <div>
                 <img src="${admin.image}" alt="${admin.name}">
                 <h3>${admin.name}</h3>
-                <p class="section-title">${admin.role}</p>
+                <h4>${admin.role}</h4>
                 <p>${admin.bio}</p>
             </div>
         `).join('');

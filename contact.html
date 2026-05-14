@@ -2,6 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PolyFriends - צור קשר</title>
     <link rel="stylesheet" href="style.css">
     <script src="function.js"></script>
@@ -9,19 +10,19 @@
 <body>
     <nav id="main-nav"></nav>
 
-    <h1 id="main-title">צוות המייסדים</h1>
+    <h1>צוות המייסדים</h1>
     <div class="gallery-container">
-        <a href="idanlin.html" class="profile-card">
+        <a href="idanlin.html">
             <img src="images\IdanLin.jpeg" alt="Idan Lin">
             <h3>עידן לין</h3>
         </a>
-        <a href="guysahar.html" class="profile-card">
+        <a href="guysahar.html">
             <img src="images\GuySahar.png" alt="Guy Sahar">
             <h3>גיא סהר</h3>
         </a>
     </div>
 
-    <h1 class="section-title">צור קשר</h1>
+    <h1>צור קשר</h1>
     <div class="standalone-form">
         <div class="market-card">
             <form onsubmit="handleFormSubmit(event)">
@@ -29,17 +30,17 @@
                 <input type="text" name="fullname" placeholder="הכנס את שמך" required>
     
                 <label>סוג פנייה:</label>
-                <div class="bet-options-wrapper">
+                <div>
                     <label><input type="radio" name="subject" value="new_market" required> התערבות חדשה</label>
                     <label><input type="radio" name="subject" value="bug_report" required> דיווח על באג</label>
                 </div>
     
-                <div class="bet-options-wrapper">
+                <div>
                     <input type="checkbox" name="terms" value="agreed" id="termsCheck" required>
-                    <label for="termsCheck" style="font-weight: normal; margin-bottom: 0;">מאשר את תקנון האתר</label>
+                    <label for="termsCheck">מאשר את תקנון האתר</label>
                 </div>
     
-                <button type="submit" class="auth-btn">שלח פנייה</button>
+                <button type="submit">שלח פנייה</button>
             </form>
         </div>
     </div>
