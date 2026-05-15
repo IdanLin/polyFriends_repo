@@ -314,8 +314,11 @@ window.renderManageBets = function() {
                           appData.categories.map(c => `<option value="${c}">${c}</option>`).join('') +
                           '<option value="other">אחר (הזן טקסט)...</option>';
                           
-    // הוספת מאזין לבחירת הקטגוריה
-    catSelect.addEventListener('change', window.checkCustomCat);
+    // שימוש ב-onchange בטוח יותר כדי לתפוס את שינוי הקטגוריה
+    catSelect.onchange = window.checkCustomCat;
+    
+    // קריאה לפונקציה פעם אחת מיד בהתחלה כדי להכין את השדה המוסתר ב-DOM
+    window.checkCustomCat();
 
     if(!currentUser) {
         closedBetsContainer.innerHTML = '<p>עליך להתחבר כדי לנהל הימורים.</p>';
@@ -340,12 +343,14 @@ window.renderManageBets = function() {
 window.checkCustomCat = function() {
     let wrapper = document.getElementById('customCategoryWrapper');
     let select = document.getElementById('categorySelect');
+    if (!select) return;
     
     // יצירה דינאמית של השדה במקרה שהוא חסר ב-HTML
-    if (!wrapper && select) {
+    if (!wrapper) {
         wrapper = document.createElement('div');
         wrapper.id = 'customCategoryWrapper';
-        wrapper.innerHTML = '<input type="text" id="customCategory" placeholder="הקלד קטגוריה חדשה..." style="margin-top: 10px; padding: 8px; width: 100%; box-sizing: border-box;">';
+        // הוספנו עיצוב ברור כדי לוודא שהשדה בולט ולא נדרס על ידי ה-CSS
+        wrapper.innerHTML = '<input type="text" id="customCategory" placeholder="הקלד קטגוריה חדשה (למשל: אוכל, סרטים)..." style="margin-top: 15px; padding: 10px; width: 100%; box-sizing: border-box; border: 2px solid #3498db; border-radius: 6px; font-size: 1rem; transition: border-color 0.3s;">';
         select.parentNode.insertBefore(wrapper, select.nextSibling);
     }
     
@@ -353,7 +358,10 @@ window.checkCustomCat = function() {
         let isOther = select.value === 'other';
         wrapper.style.display = isOther ? 'block' : 'none';
         let customInput = document.getElementById('customCategory');
-        if (customInput) customInput.required = isOther; // השדה יהיה שדה חובה רק אם נבחר "אחר"
+        if (customInput) {
+            customInput.required = isOther; // השדה יהיה שדה חובה רק אם נבחר "אחר"
+            if (isOther) customInput.focus(); // הקפצת הסמן ישר לשדה הטקסט החדש
+        }
     }
 }
 
@@ -380,6 +388,9 @@ window.createBet = async function(e) {
     await saveData();
     alert('התערבות נוצרה בהצלחה!');
     e.target.reset();
+    
+    // נעלים בחזרה את שדה הקטגוריה המותאמת לאחר שהטופס התאפס
+    window.checkCustomCat(); 
     await initApp();
 }
 
