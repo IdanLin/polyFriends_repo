@@ -8,27 +8,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function initApp() {
     try {
-        let storedData = localStorage.getItem('polyData');
-        if (!storedData) {
-            try {
-                const response = await fetch('data.json');
-                if (!response.ok) throw new Error("Network response was not ok");
-                appData = await response.json();
-            } catch (err) {
-                console.warn("Fetch failed (likely CORS on file://). Using fallback data.");
-                appData = { 
-                    users: [], categories: ["פוליטיקה", "ספורט", "קריפטו", "תרבות פופ", "כלכלה", "מדע וטכנולוגיה"], bets: [], admins: [], settlements: []
-                };
-            }
-            saveData();
-        } else {
-            appData = JSON.parse(storedData);
+        const response = await fetch('api.php');
+        if (!response.ok) {
+            let errorData = await response.json();
+            throw new Error(errorData.message || "שגיאת שרת");
         }
+        appData = await response.json();
         
         let storedUser = localStorage.getItem('currentUser');
         if (storedUser) currentUser = JSON.parse(storedUser);
     } catch(e) {
         console.error("Error initializing app", e);
+        alert("שגיאה בטעינת הנתונים: " + e.message + "\n(כנראה שפרטי החיבור למסד הנתונים ב-api.php שגויים)");
+        appData = { 
+            users: [], categories: ["פוליטיקה", "ספורט", "קריפטו", "תרבות פופ", "כלכלה", "מדע וטכנולוגיה"], bets: [], admins: [], settlements: []
+        };
     }
 
     // בניית הממשק מחוץ ל-try-catch כדי להבטיח שיופיע תמיד
@@ -45,8 +39,16 @@ async function initApp() {
     else if (path.includes('payout_calc.html')) preparePayoutCalc();
 }
 
-function saveData() {
-    localStorage.setItem('polyData', JSON.stringify(appData));
+async function saveData() {
+    try {
+        await fetch('api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(appData)
+        });
+    } catch (e) {
+        console.error("Failed to save data to server", e);
+    }
 }
 
 // ================= Nav & Auth UI =================
@@ -158,7 +160,7 @@ window.toggleAuthMode = function() {
     document.getElementById('authToggleText').innerText = authMode === 'login' ? 'משתמש חדש? לחץ כאן להרשמה' : 'משתמש רשום? לחץ כאן להתחברות';
 }
 
-window.handleAuth = function(e) {
+window.handleAuth = async function(e) {
     e.preventDefault();
     let user = document.getElementById('authUser').value.trim();
     let pass = document.getElementById('authPass').value.trim();
@@ -187,7 +189,7 @@ window.handleAuth = function(e) {
         appData.users.push(newUser);
         currentUser = newUser;
         localStorage.setItem('currentUser', JSON.stringify(currentUser));
-        saveData();
+        await saveData();
         window.location.reload();
     }
 }
@@ -295,10 +297,10 @@ window.renderMarkets = function() {
     container.innerHTML = html || '<p style="text-align:center; width:100%;">לא נמצאו התערבויות העונות לסינון.</p>';
 }
 
-window.joinBet = function(betId, option) {
+window.joinBet = async function(betId, option) {
     let bet = appData.bets.find(b => b.id === betId);
     bet.participants[currentUser.username] = option;
-    saveData();
+    await saveData();
     renderMarkets();
 }
 
@@ -312,6 +314,9 @@ window.renderManageBets = function() {
                           appData.categories.map(c => `<option value="${c}">${c}</option>`).join('') +
                           '<option value="other">אחר (הזן טקסט)...</option>';
                           
+    // הוספת מאזין לבחירת הקטגוריה
+    catSelect.addEventListener('change', window.checkCustomCat);
+
     if(!currentUser) {
         closedBetsContainer.innerHTML = '<p>עליך להתחבר כדי לנהל הימורים.</p>';
         document.getElementById('createBetBtn').disabled = true;
@@ -333,10 +338,26 @@ window.renderManageBets = function() {
 }
 
 window.checkCustomCat = function() {
-    document.getElementById('customCategoryWrapper').style.display = document.getElementById('categorySelect').value === 'other' ? 'block' : 'none';
+    let wrapper = document.getElementById('customCategoryWrapper');
+    let select = document.getElementById('categorySelect');
+    
+    // יצירה דינאמית של השדה במקרה שהוא חסר ב-HTML
+    if (!wrapper && select) {
+        wrapper = document.createElement('div');
+        wrapper.id = 'customCategoryWrapper';
+        wrapper.innerHTML = '<input type="text" id="customCategory" placeholder="הקלד קטגוריה חדשה..." style="margin-top: 10px; padding: 8px; width: 100%; box-sizing: border-box;">';
+        select.parentNode.insertBefore(wrapper, select.nextSibling);
+    }
+    
+    if (wrapper) {
+        let isOther = select.value === 'other';
+        wrapper.style.display = isOther ? 'block' : 'none';
+        let customInput = document.getElementById('customCategory');
+        if (customInput) customInput.required = isOther; // השדה יהיה שדה חובה רק אם נבחר "אחר"
+    }
 }
 
-window.createBet = function(e) {
+window.createBet = async function(e) {
     e.preventDefault();
     if(!currentUser) return alert('יש להתחבר!');
     let title = document.getElementById('betTitle').value;
@@ -356,26 +377,26 @@ window.createBet = function(e) {
         options: opts, participants: {}, winningOption: null
     };
     appData.bets.push(newBet);
-    saveData();
+    await saveData();
     alert('התערבות נוצרה בהצלחה!');
     e.target.reset();
-    initApp();
+    await initApp();
 }
 
-window.closeBet = function(betId) {
+window.closeBet = async function(betId) {
     let bet = appData.bets.find(b => b.id === betId);
     let winningOption = prompt(`מי ניצח בהתערבות "${bet.title}"?\nהקלד אחת מהאפשרויות: ${bet.options.join(' / ')}`);
     if(!winningOption || !bet.options.includes(winningOption)) return alert('בחירה לא תקינה או בוטלה.');
     
     bet.status = 'closed';
     bet.winningOption = winningOption;
-    saveData();
+    await saveData();
     renderManageBets();
     alert('התערבות נסגרה בהצלחה! המאזנים התעדכנו אוטומטית.');
 }
 
 // 3. Ledger (Participants)
-window.renderLedger = function() {
+window.renderLedger = async function() {
     const container = document.getElementById('ledger-container');
     if (!container) return;
     
@@ -451,57 +472,80 @@ window.renderLedger = function() {
         }
     });
 
-    saveData(); // Save computed balances
+    await saveData(); // Save computed balances
     
     container.innerHTML = appData.users.map(user => {
         let displayBalance = Math.round(user.balance * 100) / 100;
         let bClass = displayBalance > 0 ? 'balance-positive' : (displayBalance < 0 ? 'balance-negative' : 'balance-zero');
-        let sign = displayBalance > 0 ? '+' : '';
+        let balanceDesc = displayBalance > 0 ? 'בפלוס (רווח)' : (displayBalance < 0 ? 'במינוס (חוב)' : 'מאוזן');
+        let absTotal = Math.abs(displayBalance);
 
         let debtsHtml = '';
         if (user.debts && Object.keys(user.debts).length > 0) {
             let debtRows = '';
             for (let [otherUser, amount] of Object.entries(user.debts)) {
-                if (Math.round(amount * 100) / 100 !== 0) {
+                let displayAmount = Math.round(amount * 100) / 100;
+                if (displayAmount !== 0) {
+                    let isMe = currentUser && user.username === currentUser.username;
                     let otherUserObj = appData.users.find(u => u.username === otherUser);
                     let otherName = otherUserObj ? otherUserObj.fullName : otherUser;
-                    let displayAmount = Math.round(amount * 100) / 100;
+                    let absAmount = Math.abs(displayAmount);
+                    
                     let color = displayAmount > 0 ? '#2ecc71' : '#e74c3c';
-                    let amountSign = displayAmount > 0 ? '+' : '';
+                    let desc = '';
                     
                     let settleBtn = '';
-                    // רק המשתמש שמגיע לו הכסף (מאזן חיובי) יכול לדווח שהחזירו לו אותו
-                    if (currentUser && user.username === currentUser.username && displayAmount > 0) {
-                        settleBtn = `<button onclick="settleDebt('${otherUser}', ${displayAmount})" style="font-size:0.75em; padding:3px 8px; margin-right:8px; background:#2196F3; color:white; border:none; border-radius:4px; cursor:pointer;">קבלת תשלום</button>`;
+                    
+                    if (displayAmount > 0) {
+                        // משתמש אחר חייב כסף ליוזר הנוכחי של הכרטיסייה
+                        desc = isMe ? 'חייב/ת לך' : `חייב/ת ל${user.fullName}`;
+                        if (isMe) {
+                            // רק אם אני מסתכל על הכרטיסייה שלי ומישהו חייב לי - אוכל לסמן שהחזיר לי
+                            settleBtn = `<button onclick="settleDebt('${otherUser}', ${absAmount})" style="font-size:0.75em; padding:4px 10px; margin-right:10px; background:#2ecc71; color:white; border:none; border-radius:12px; cursor:pointer; font-weight:bold;">סמן שהחזיר לי</button>`;
+                        }
+                    } else {
+                        // היוזר הנוכחי של הכרטיסייה חייב כסף למשתמש אחר
+                        desc = isMe ? `אתה חייב/ת ל${otherName}` : `${user.fullName} חייב/ת ל${otherName}`;
+                        // אין פה כפתור! רק מי שמקבל את הכסף יכול לדווח שהוא קיבל אותו
                     }
+                    
                     debtRows += `
-                        <div class="debt-row">
-                            <div class="debt-user"><span>${otherName}</span>${settleBtn}</div>
-                            <span style="color: ${color}; font-weight: bold; direction: ltr;">${amountSign}${displayAmount} ₪</span>
+                        <div class="debt-row" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+                            <div class="debt-user" style="display: flex; align-items: center;">
+                                <span style="font-weight: bold; font-size: 1.1em;">${otherName}</span>
+                                ${settleBtn}
+                            </div>
+                            <span style="color: ${color}; font-weight: bold;">${desc} ${absAmount} ₪</span>
                         </div>`;
                 }
             }
             if (debtRows) {
                 debtsHtml = `
-                    <div class="debts-wrapper">
-                        <h4>מאזן מול משתתפים:</h4>
+                    <div class="debts-wrapper" style="margin-top: 15px; background: #fafafa; padding: 10px; border-radius: 8px;">
+                        <h4 style="margin-top: 0; margin-bottom: 10px; color: #333; border-bottom: 2px solid #e0e0e0; padding-bottom: 5px;">פירוט חובות פנימי:</h4>
                         ${debtRows}
                     </div>`;
             }
         }
         
         return `
-            <div>
-                <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName)}&background=random&color=fff">
-                <h3>${user.fullName}</h3>
-                <h4>@${user.username}</h4>
-                <div class="balance-badge ${bClass}">סך הכל: ${sign}${displayBalance} ₪</div>
+            <div class="market-card" style="margin-bottom: 20px; padding: 20px;">
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                    <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName)}&background=random&color=fff" style="border-radius: 50%; width: 50px; height: 50px;">
+                    <div>
+                        <h3 style="margin: 0;">${user.fullName}</h3>
+                        <h4 style="margin: 0; color: #7f8c8d;">@${user.username}</h4>
+                    </div>
+                </div>
+                <div class="balance-badge ${bClass}" style="display: inline-block; padding: 8px 12px; border-radius: 20px; font-weight: bold; margin-bottom: 10px;">
+                    סך הכל: ${balanceDesc} ${absTotal} ₪
+                </div>
                 ${debtsHtml}
             </div>`;
     }).join('');
 }
 
-window.settleDebt = function(debtorUsername, maxAmount) {
+window.settleDebt = async function(debtorUsername, maxAmount) {
     if (!currentUser) return;
     
     let debtorObj = appData.users.find(u => u.username === debtorUsername);
@@ -526,7 +570,7 @@ window.settleDebt = function(debtorUsername, maxAmount) {
         timestamp: Date.now()
     });
     
-    saveData();
+    await saveData();
     renderLedger(); // רינדור מחדש להצגת המאזנים המעודכנים
     alert('התשלום דווח והמאזנים עודכנו בהצלחה!');
 }
