@@ -10,21 +10,75 @@
 <body>
     <nav id="main-nav"></nav>
 
-    <h1>מחשבון חלוקת זכיות (חישוב מקומי)</h1>
+    <h1>מחשבון חלוקת זכיות</h1>
 
     <div class="standalone-form">
         <div class="market-card">
-            <form id="calcForm">
-                <input type="number" id="pool_amount" placeholder="הכנס קופה כוללת" required>
-                <button type="button" onclick="calculatePayout()">חשב פוטנציאל זכייה נטו</button>
+            <form id="calcForm" onsubmit="return false;">
+                <label for="num_participants">מספר משתתפים:</label>
+                <input type="number" id="num_participants" placeholder="לדוגמה: 5" min="2" required oninput="calculatePayout()">
+
+                <label for="amount_each">סכום לכל משתתף (₪):</label>
+                <input type="number" id="amount_each" placeholder="לדוגמה: 100" min="1" required oninput="calculatePayout()">
+
+                <label for="num_winners">מספר זוכים:</label>
+                <input type="number" id="num_winners" placeholder="לדוגמה: 1" min="1" required oninput="calculatePayout()">
             </form>
         </div>
-    
-        <div class="market-card">
-            <h3>תוצאת החישוב:</h3>
-            <p id="calcResult" style="font-weight: bold; color: #2ecc71; font-size: 1.1em;"></p>
+
+        <div class="market-card" id="results-card" style="display:none;">
+            <h3>תוצאות החישוב:</h3>
+            <table id="payoutTable">
+                <thead>
+                    <tr>
+                        <th>פרמטר</th>
+                        <th>ערך</th>
+                    </tr>
+                </thead>
+                <tbody id="payoutTableBody">
+                </tbody>
+            </table>
         </div>
     </div>
+
+    <script>
+        window.calculatePayout = function() {
+            const participants = parseInt(document.getElementById('num_participants').value);
+            const amountEach = parseFloat(document.getElementById('amount_each').value);
+            const winners = parseInt(document.getElementById('num_winners').value);
+
+            if (!participants || !amountEach || !winners) {
+                document.getElementById('results-card').style.display = 'none';
+                return;
+            }
+
+            if (winners > participants) {
+                alert('מספר הזוכים לא יכול להיות גדול ממספר המשתתפים!');
+                document.getElementById('num_winners').value = '';
+                document.getElementById('results-card').style.display = 'none';
+                return;
+            }
+
+            const totalPool = participants * amountEach;
+            const perWinner = totalPool / winners;
+
+            const rows = [
+                ['סך כל המשתתפים', participants],
+                ['סכום לכל משתתף', '₪' + amountEach.toFixed(2)],
+                ['קופה כוללת', '₪' + totalPool.toFixed(2)],
+                ['מספר זוכים', winners],
+                ['זכייה לכל מנצח', '₪' + perWinner.toFixed(2)],
+                ['כל מפסיד משלם', '₪' + amountEach.toFixed(2)],
+            ];
+
+            const tbody = document.getElementById('payoutTableBody');
+            tbody.innerHTML = rows.map(([label, value]) =>
+                `<tr><td>${label}</td><td><strong>${value}</strong></td></tr>`
+            ).join('');
+
+            document.getElementById('results-card').style.display = 'block';
+        }
+    </script>
 
     <footer id="main-footer"></footer>
 </body>
