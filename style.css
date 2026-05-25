@@ -353,6 +353,38 @@ th, td {
     padding: 0 15px;
 }
 
+.info-heading {
+    margin-top: 40px;
+}
+
+.features-table thead tr {
+    background-color: #2196F3;
+    color: white;
+}
+
+.features-table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.community-rules {
+    text-align: right;
+    line-height: 1.8;
+    font-size: 1.1em;
+    color: #555;
+    margin-bottom: 30px;
+    padding-right: 20px;
+}
+
+.video-section-wrapper {
+    margin: 50px 0;
+    width: 100%;
+    text-align: center;
+}
+
+.video-heading {
+    margin-bottom: 20px;
+}
+
 .video-container {
     position: relative;
     padding-bottom: 56.25%;

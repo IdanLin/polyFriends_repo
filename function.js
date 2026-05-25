@@ -1,4 +1,4 @@
-let appData = { users: [], categories: [], bets: [], admins: [] };
+let appData = { users: [], categories: [], bets: [], admins: [], settlements: [], messages: [] };
 let currentUser = null;
 let authMode = 'login';
 
@@ -21,7 +21,7 @@ async function initApp() {
         console.error("Error initializing app", e);
         alert("שגיאה בטעינת הנתונים: " + e.message + "\n(כנראה שפרטי החיבור למסד הנתונים ב-api.php שגויים)");
         appData = { 
-            users: [], categories: ["פוליטיקה", "ספורט", "קריפטו", "תרבות פופ", "כלכלה", "מדע וטכנולוגיה"], bets: [], admins: [], settlements: []
+            users: [], categories: ["פוליטיקה", "ספורט", "קריפטו", "תרבות פופ", "כלכלה", "מדע וטכנולוגיה"], bets: [], admins: [], settlements: [], messages: []
         };
     }
 
@@ -41,13 +41,18 @@ async function initApp() {
 
 async function saveData() {
     try {
-        await fetch('api.php', {
+        const response = await fetch('api.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(appData)
         });
+        if (!response.ok) {
+            console.error("Server error:", await response.text());
+            alert("שגיאה בשמירת הנתונים. נא לבדוק את החיבור לשרת.");
+        }
     } catch (e) {
         console.error("Failed to save data to server", e);
+        alert("שגיאת תקשורת: הנתונים לא נשמרו בשרת.");
     }
 }
 
@@ -225,13 +230,31 @@ function buildFooter() {
             <div class="footer-input">
                 <h4>השאר לנו הודעה / הרשם לעדכונים</h4>
                 <input type="text" placeholder="כתוב משהו..." id="footerInput">
-                <button class="auth-btn" onclick="alert('תודה! קלטנו את ההודעה.')">שלח</button>
+                <button class="auth-btn" onclick="submitContact()">שלח</button>
             </div>
         </div>
         <div class="footer-bottom">
             <p>&copy; 2026 PolyFriends. כל הזכויות שמורות.</p>
         </div>
     `;
+}
+
+window.submitContact = async function() {
+    let input = document.getElementById('footerInput');
+    let msg = input.value.trim();
+    if(!msg) return alert('נא להזין הודעה בטופס.');
+    
+    if(!appData.messages) appData.messages = [];
+    appData.messages.push({
+        id: 'msg_' + Date.now(),
+        username: currentUser ? currentUser.username : null,
+        message: msg,
+        timestamp: Date.now()
+    });
+    
+    await saveData();
+    input.value = '';
+    alert('תודה! קלטנו את ההודעה בהצלחה!');
 }
 
 // ================= Pages Logic =================
@@ -401,17 +424,13 @@ window.closeBet = async function(betId) {
     
     bet.status = 'closed';
     bet.winningOption = winningOption;
+    updateBalances();
     await saveData();
     renderManageBets();
     alert('התערבות נסגרה בהצלחה! המאזנים התעדכנו אוטומטית.');
 }
 
-// 3. Ledger (Participants)
-window.renderLedger = async function() {
-    const container = document.getElementById('ledger-container');
-    if (!container) return;
-    
-    // חישוב אוטומטי של המאזנים מתוך היסטוריית ההתערבויות שנסגרו
+window.updateBalances = function() {
     appData.users.forEach(u => {
         u.balance = 0;
         u.debts = {}; // מאזן פנימי מול כל משתמש
@@ -482,6 +501,14 @@ window.renderLedger = async function() {
             creditor.debts[s.from] = (creditor.debts[s.from] || 0) - s.amount;
         }
     });
+}
+
+// 3. Ledger (Participants)
+window.renderLedger = async function() {
+    const container = document.getElementById('ledger-container');
+    if (!container) return;
+    
+    updateBalances();
 
     await saveData(); // Save computed balances
     

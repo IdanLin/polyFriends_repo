@@ -50,7 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'admins' => [
                 ["name" => "עידן", "role" => "מייסד ומפתח", "bio" => "מפתח פול-סטאק", "image" => "https://ui-avatars.com/api/?name=Idan&background=0D8ABC&color=fff"]
             ],
-            'settlements' => []
+            'settlements' => [],
+            'messages' => []
         ];
         echo json_encode($defaultData);
     } else {
@@ -79,10 +80,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $bet['participants'] = $parts;
         }
 
-        $settlements = $pdo->query("SELECT from_user AS `from`, to_user AS `to`, amount, timestamp FROM settlements")->fetchAll();
+        $settlements = $pdo->query("SELECT from_user AS `from`, to_user AS `to`, amount, timestamp FROM settlements ORDER BY timestamp ASC")->fetchAll();
         foreach ($settlements as &$s) {
             $s['amount'] = (float)$s['amount'];
             $s['timestamp'] = (int)$s['timestamp'];
+        }
+
+        $messages = $pdo->query("SELECT id, username, message, timestamp FROM contact_messages ORDER BY timestamp ASC")->fetchAll();
+        foreach ($messages as &$m) {
+            $m['timestamp'] = (int)$m['timestamp'];
         }
 
         echo json_encode([
@@ -90,7 +96,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'categories' => $categories,
             'bets' => $bets,
             'admins' => $admins,
-            'settlements' => $settlements
+            'settlements' => $settlements,
+            'messages' => $messages
         ]);
     }
 } 
@@ -148,6 +155,14 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (isset($data['settlements'])) {
                 foreach ($data['settlements'] as $s) {
                     $stmtSet->execute([$s['from'], $s['to'], $s['amount'], $s['timestamp']]);
+                }
+            }
+
+            // 6. שמירת הודעות צור קשר (טפסים)
+            $stmtMsg = $pdo->prepare("INSERT IGNORE INTO contact_messages (id, username, message, timestamp) VALUES (?, ?, ?, ?)");
+            if (isset($data['messages'])) {
+                foreach ($data['messages'] as $m) {
+                    $stmtMsg->execute([$m['id'], $m['username'], $m['message'], $m['timestamp']]);
                 }
             }
 
