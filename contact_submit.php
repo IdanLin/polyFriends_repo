@@ -14,8 +14,8 @@ $mail_body .= "סוג פנייה: $subject\n";
 $mail_body .= "תקנון: $terms\n";
 $mail_body .= "הודעה:\n$message\n";
 
-$headers = "From: noreply@polyfriends.com\r\n";
-$headers .= "Reply-To: noreply@polyfriends.com\r\n";
+$headers = "From: noreply@idanlin.byethost31.com\r\n";
+$headers .= "Reply-To: noreply@idanlin.byethost31.com\r\n";
 $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
 
 $sent = mail($to, $mail_subject, $mail_body, $headers);
