@@ -25,7 +25,7 @@
     <h1>צור קשר</h1>
     <div class="standalone-form">
         <div class="market-card">
-            <form onsubmit="handleFormSubmit(event)">
+            <form action="contact_submit.php" method="post">
                 <label>שם מלא:</label>
                 <input type="text" name="fullname" placeholder="הכנס את שמך" required>
     
@@ -35,23 +35,19 @@
                     <label><input type="radio" name="subject" value="bug_report" required> דיווח על באג</label>
                 </div>
     
+                <label>הודעה חופשית:</label>
+                <textarea name="message" placeholder="כתוב את הודעתך כאן..." rows="5"></textarea>
+
                 <div>
                     <input type="checkbox" name="terms" value="agreed" id="termsCheck" required>
                     <label for="termsCheck">מאשר את תקנון האתר</label>
                 </div>
-    
+
                 <button type="submit">שלח פנייה</button>
             </form>
         </div>
     </div>
     <footer id="main-footer"></footer>
 
-    <script>
-        function handleFormSubmit(event) {
-            event.preventDefault(); // מונע את רענון הדף בעת השליחה
-            alert('ההודעה נשלחה בהצלחה לחברי הצוות!');
-            event.target.reset(); // מאפס את הטופס
-        }
-    </script>
 </body>
 </html>
