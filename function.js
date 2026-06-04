@@ -298,17 +298,20 @@ window.renderMarkets = function() {
                 }).join('');
                 buttonsHtml = `<div class="bet-options-wrapper">${buttonsHtml}</div>`;
             } else {
-                buttonsHtml = `<p class="closed-bet-notice">התחבר כדי להשתתף</p>`;
+                buttonsHtml = `<button class="auth-btn" style="width:100%;padding:10px;" onclick="document.getElementById('authModal').style.display='flex'">התחבר כדי להשתתף</button>`;
             }
         }
         
         let potAmount = Object.keys(bet.participants).length * bet.amount;
-        
+        let creatorUser = appData.users.find(u => u.username === bet.creator);
+        let creatorName = creatorUser ? creatorUser.fullName : bet.creator;
+
         html += `
         <div class="bet-card">
             <div>
                 <h3>${bet.title}</h3>
                 <h4>${bet.category}</h4>
+                <p style="font-size:0.85em;color:#aaa;margin:0 0 10px 0;">👤 ${creatorName}</p>
                 <p>סכום השתתפות: ₪${bet.amount}</p>
             </div>
             <div>
@@ -321,9 +324,18 @@ window.renderMarkets = function() {
 }
 
 window.joinBet = async function(betId, option) {
-    let bet = appData.bets.find(b => b.id === betId);
-    bet.participants[currentUser.username] = option;
-    await saveData();
+    try {
+        const res = await fetch('api.php?action=join_bet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ betId, username: currentUser.username, option })
+        });
+        if (!res.ok) throw new Error((await res.json()).message || 'שגיאת שרת');
+        const fresh = await fetch('api.php');
+        appData = await fresh.json();
+    } catch(e) {
+        alert('שגיאה בהצטרפות להימור: ' + e.message);
+    }
     renderMarkets();
 }
 
@@ -396,25 +408,33 @@ window.createBet = async function(e) {
     let cat = document.getElementById('categorySelect').value;
     if(cat === 'other') {
         cat = document.getElementById('customCategory').value.trim();
-        if(cat && !appData.categories.includes(cat)) appData.categories.push(cat);
     }
-    
+
     let opt1 = document.getElementById('betOption1').value.trim();
     let opt2 = document.getElementById('betOption2').value.trim();
     let opts = [opt1, opt2].filter(o => o);
-    
+
     let newBet = {
         id: 'bet_' + Date.now(), title, amount, category: cat, creator: currentUser.username, status: 'open',
         options: opts, participants: {}, winningOption: null
     };
-    appData.bets.push(newBet);
-    await saveData();
-    alert('התערבות נוצרה בהצלחה!');
-    e.target.reset();
-    
-    // נעלים בחזרה את שדה הקטגוריה המותאמת לאחר שהטופס התאפס
-    window.checkCustomCat(); 
-    await initApp();
+
+    try {
+        const res = await fetch('api.php?action=create_bet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newBet)
+        });
+        if (!res.ok) throw new Error((await res.json()).message || 'שגיאת שרת');
+        const fresh = await fetch('api.php');
+        appData = await fresh.json();
+        alert('התערבות נוצרה בהצלחה!');
+        e.target.reset();
+        window.checkCustomCat();
+        renderManageBets();
+    } catch(e) {
+        alert('שגיאה ביצירת ההימור: ' + e.message);
+    }
 }
 
 window.closeBet = async function(betId) {

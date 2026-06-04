@@ -103,9 +103,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 } 
 // טיפול בבקשות POST (שמירת נתונים לדאטא-בייס)
 elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_GET['action'] ?? null;
     $input = file_get_contents('php://input');
     $data = json_decode($input, true);
-    
+
+    if ($data === null) {
+        http_response_code(400);
+        echo json_encode(['status' => 'error', 'message' => 'Invalid JSON']);
+        exit;
+    }
+
+    if ($action === 'join_bet') {
+        try {
+            $stmt = $pdo->prepare("INSERT INTO bet_participants (bet_id, username, option_name) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE option_name=VALUES(option_name)");
+            $stmt->execute([$data['betId'], $data['username'], $data['option']]);
+            echo json_encode(['status' => 'success']);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    if ($action === 'create_bet') {
+        try {
+            $pdo->beginTransaction();
+            $stmtCat = $pdo->prepare("INSERT IGNORE INTO categories (name) VALUES (?)");
+            $stmtCat->execute([$data['category']]);
+
+            $stmtBet = $pdo->prepare("INSERT INTO bets (id, title, amount, category, creator, status, winning_option) VALUES (?, ?, ?, ?, ?, 'open', NULL)");
+            $stmtBet->execute([$data['id'], $data['title'], $data['amount'], $data['category'], $data['creator']]);
+
+            $stmtOpt = $pdo->prepare("INSERT IGNORE INTO bet_options (bet_id, option_name) VALUES (?, ?)");
+            foreach ($data['options'] as $opt) {
+                $stmtOpt->execute([$data['id'], $opt]);
+            }
+            $pdo->commit();
+            echo json_encode(['status' => 'success']);
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     if ($data !== null) {
         try {
             $pdo->beginTransaction();
@@ -173,9 +215,6 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => 'DB Error: ' . $e->getMessage()]);
         }
-    } else {
-        http_response_code(400);
-        echo json_encode(['status' => 'error', 'message' => 'Invalid JSON']);
     }
 } else {
     http_response_code(405);
