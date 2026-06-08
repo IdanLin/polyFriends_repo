@@ -25,37 +25,172 @@
     <h1>צור קשר</h1>
     <div class="standalone-form">
         <div class="market-card">
-            <form id="contactForm">
-                <label>שם מלא:</label>
-                <input type="text" name="fullname" placeholder="הכנס את שמך" required>
-    
-                <label>סוג פנייה:</label>
-                <div>
-                    <label><input type="radio" name="subject" value="new_market" required> התערבות חדשה</label>
-                    <label><input type="radio" name="subject" value="bug_report" required> דיווח על באג</label>
-                </div>
-    
-                <label>הודעה חופשית:</label>
-                <textarea name="message" placeholder="כתוב את הודעתך כאן..." rows="5"></textarea>
+            <form id="contactForm" action="mailto:sahar.guy@gmail.com" method="post" enctype="text/plain">
 
-                <button type="submit">שלח פנייה</button>
+                <p>
+                    <label>שם מלא <span class="required-star">*</span></label>
+                    <input type="text" name="fullname" placeholder="הכנס את שמך" required>
+                </p>
+
+                <p>
+                    <label>סוג פנייה <span class="required-star">*</span></label>
+                    <div>
+                        <label><input type="radio" name="subject" value="new_market" required> התערבות חדשה</label>
+                        <label><input type="radio" name="subject" value="bug_report" required> דיווח על באג</label>
+                    </div>
+                </p>
+
+                <p>
+                    <label>אזור:</label>
+                    <select name="area">
+                        <option value="gush_dan" selected>גוש דן</option>
+                        <option value="center">מרכז</option>
+                        <option value="jerusalem">ירושלים והסביבה</option>
+                        <option value="north">צפון</option>
+                        <option value="haifa">חיפה והכרמל</option>
+                        <option value="south">דרום</option>
+                        <option value="sharon">שרון</option>
+                        <option value="shfela">שפלה</option>
+                    </select>
+                </p>
+
+                <p>
+                    <label>סיסמה:</label>
+                    <input type="password" name="password" placeholder="הזן סיסמה">
+                </p>
+
+                <p>
+                    <label>כתובת אימייל:</label>
+                    <input type="email" name="email" placeholder="example@email.com">
+                </p>
+
+                <p>
+                    <label>כתובת אתר אינטרנט:</label>
+                    <input type="url" name="website" placeholder="https://www.example.com">
+                </p>
+
+                <p>
+                    <label>מספר טלפון:</label>
+                    <input type="tel" name="phone" placeholder="050-0000000">
+                </p>
+
+                <p>
+                    <label>גיל (10–20, קפיצות של 2):</label>
+                    <input type="number" name="age" min="10" max="20" step="2">
+                </p>
+
+                <p>
+                    <label>רמת שביעות רצון:</label>
+                    <div class="range-wrapper">
+                        <span>10</span>
+                        <input type="range" name="satisfaction" min="10" max="100" step="5">
+                        <span>100</span>
+                    </div>
+                </p>
+
+                <p>
+                    <label>צבע מועדף:</label>
+                    <input type="color" name="favorite_color" value="#2196F3">
+                </p>
+
+                <p>
+                    <label>תאריך לידה:</label>
+                    <input type="date" name="birthdate">
+                </p>
+
+                <p>
+                    <label>שעת פגישה מועדפת:</label>
+                    <input type="time" name="meeting_time">
+                </p>
+
+                <p>
+                    <label>תאריך ושעה:</label>
+                    <input type="datetime-local" name="datetime">
+                </p>
+
+                <p>
+                    <label>הודעה חופשית <span class="required-star">*</span></label>
+                    <textarea name="message" cols="30" rows="3" placeholder="כתוב את הודעתך כאן..." required></textarea>
+                </p>
+
+                <p>
+                    <label>העלאת קבצים:</label>
+                    <input type="file" name="attachments" multiple>
+                </p>
+
+                <p>
+                    <label>דפדפן מועדף:</label>
+                    <input type="text" name="browser" list="browsers" placeholder="בחר דפדפן...">
+                    <datalist id="browsers">
+                        <option value="Chrome">
+                        <option value="Firefox">
+                        <option value="Safari">
+                        <option value="Opera">
+                        <option value="Internet Explorer">
+                    </datalist>
+                </p>
+
+                <p>
+                    <div class="buttons-wrapper">
+                        <input type="reset" value="נקה טופס">
+                        <input type="submit" value="שלח פנייה">
+                    </div>
+                </p>
+
             </form>
         </div>
     </div>
     <footer id="main-footer"></footer>
 
     <script>
-        document.getElementById('contactForm').addEventListener('submit', async function(e) {
+        document.getElementById('contactForm').addEventListener('submit', function(e) {
             e.preventDefault();
-            const formData = new FormData(this);
-            const response = await fetch('contact_submit.php', { method: 'POST', body: formData });
-            const result = await response.json();
-            if (result.status === 'success') {
-                alert('ההודעה נשלחה בהצלחה');
-                this.reset();
-            } else {
-                alert('שגיאה בשליחה, נסה שנית.');
-            }
+
+            const form = this;
+            const subjectLabels = { new_market: 'התערבות חדשה', bug_report: 'דיווח על באג' };
+            const labelMap = {
+                fullname:       'שם מלא',
+                subject:        'סוג פנייה',
+                area:           'אזור',
+                password:       'סיסמה',
+                email:          'אימייל',
+                website:        'אתר אינטרנט',
+                phone:          'טלפון',
+                age:            'גיל',
+                satisfaction:   'שביעות רצון',
+                favorite_color: 'צבע מועדף',
+                birthdate:      'תאריך לידה',
+                meeting_time:   'שעת פגישה',
+                datetime:       'תאריך ושעה',
+                message:        'הודעה',
+                attachments:    'קבצים',
+                browser:        'דפדפן'
+            };
+
+            const message = form.querySelector('textarea[name="message"]').value.trim();
+
+            const fullname = form.querySelector('input[name="fullname"]').value.trim();
+            const email    = form.querySelector('input[name="email"]').value.trim();
+            const phone    = form.querySelector('input[name="phone"]').value.trim();
+            const area     = form.querySelector('select[name="area"]');
+            const areaText = area ? area.options[area.selectedIndex].text : '';
+
+            const subjectVal = form.querySelector('input[name="subject"]:checked');
+            const subjectText = subjectVal ? (subjectLabels[subjectVal.value] || subjectVal.value) : '';
+
+            const contactLines = [
+                `Full Name: ${fullname}`,
+                email ? `Email: ${email}` : null,
+                phone ? `Phone: ${phone}` : null,
+                `Area: ${areaText}`
+            ].filter(Boolean).join('\n');
+
+            const bodyText = `${message}\n\n---\nContact Information:\n${contactLines}`;
+
+            const mailSubject = encodeURIComponent(`${subjectText} - ${fullname}`);
+            const mailBody    = encodeURIComponent(bodyText);
+
+            window.location.href = `mailto:sahar.guy@gmail.com?subject=${mailSubject}&body=${mailBody}`;
         });
     </script>
 </body>
