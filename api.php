@@ -23,6 +23,33 @@ try {
 }
 
 // טיפול בבקשות GET (קריאת נתונים מהדאטא-בייס)
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['action'] === 'leaderboard') {
+    $sql = "
+        SELECT
+            u.username,
+            u.full_name AS fullName,
+            COALESCE(SUM(
+                CASE
+                    WHEN b.status != 'closed' OR b.winning_option IS NULL THEN 0
+                    WHEN (SELECT COUNT(*) FROM bet_participants lx WHERE lx.bet_id = b.id AND lx.option_name != b.winning_option) = 0 THEN 0
+                    WHEN bp.option_name = b.winning_option THEN
+                        (SELECT COUNT(*) FROM bet_participants lw WHERE lw.bet_id = b.id AND lw.option_name != b.winning_option) * b.amount /
+                        (SELECT COUNT(*) FROM bet_participants lw2 WHERE lw2.bet_id = b.id AND lw2.option_name = b.winning_option)
+                    ELSE -b.amount
+                END
+            ), 0) AS net
+        FROM users u
+        LEFT JOIN bet_participants bp ON u.username = bp.username
+        LEFT JOIN bets b ON bp.bet_id = b.id
+        GROUP BY u.username, u.full_name
+        ORDER BY net DESC
+    ";
+    $rows = $pdo->query($sql)->fetchAll();
+    foreach ($rows as &$r) { $r['net'] = round((float)$r['net'], 2); }
+    echo json_encode($rows);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     // נבדוק אם טבלת המשתמשים ריקה (כלומר מסד נתונים חדש לחלוטין)
     $stmt = $pdo->query("SELECT COUNT(*) FROM users");

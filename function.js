@@ -621,24 +621,30 @@ window.confirmCloseBet = async function(betId, winningOption) {
 }
 
 // 3. Ledger (Participants)
-window.renderLedger = function() {
+window.renderLedger = async function() {
     const container = document.getElementById('ledger-container');
     if (!container) return;
 
-    container.innerHTML = appData.users.map(user => {
-        let balance = Math.round((user.balance || 0) * 100) / 100;
-        let bClass = balance > 0 ? 'balance-positive' : (balance < 0 ? 'balance-negative' : 'balance-zero');
+    const res = await fetch('api.php?action=leaderboard');
+    const rows = await res.json();
 
+    const medals = ['🥇', '🥈', '🥉'];
+    container.innerHTML = rows.map((user, i) => {
+        const net = user.net;
+        const bClass = net > 0 ? 'balance-positive' : (net < 0 ? 'balance-negative' : 'balance-zero');
+        const netText = net > 0 ? `+₪${net}` : (net < 0 ? `-₪${Math.abs(net)}` : '₪0');
+        const rank = medals[i] || `#${i + 1}`;
         return `
             <div class="market-card" style="margin-bottom: 20px; padding: 20px;">
                 <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                    <span style="font-size: 1.8em;">${rank}</span>
                     <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName)}&background=random&color=fff" style="border-radius: 50%; width: 50px; height: 50px;">
                     <div>
                         <h3 style="margin: 0;">${user.fullName}</h3>
                         <h4 style="margin: 0; color: #7f8c8d;">@${user.username}</h4>
                     </div>
                 </div>
-                <div class="balance-badge ${bClass}">יתרה: ₪${balance}</div>
+                <div class="balance-badge ${bClass}">${netText}</div>
             </div>`;
     }).join('');
 }
