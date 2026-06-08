@@ -611,6 +611,61 @@ th, td {
     flex: 1;
 }
 
+/* Vote split bar */
+.vote-bar-wrapper {
+    margin: 12px 0 4px 0;
+}
+
+.vote-bar {
+    display: flex;
+    height: 10px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #e0e0e0;
+}
+
+.vote-bar-left {
+    background-color: #2196F3;
+    transition: width 0.4s ease;
+}
+
+.vote-bar-right {
+    background-color: #e74c3c;
+    transition: width 0.4s ease;
+}
+
+.vote-bar-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8em;
+    color: #777;
+    margin-top: 4px;
+}
+
+/* Locked choice notice */
+.locked-choice-notice {
+    color: #2ecc71;
+    font-weight: bold;
+    margin-top: 10px;
+    padding: 10px;
+    background: #e8f8f5;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #2ecc71;
+}
+
+/* Lock button */
+.lock-btn {
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px;
+    background-color: #f39c12 !important;
+}
+
+.lock-btn:hover {
+    background-color: #d68910 !important;
+}
+
 .closed-bet-notice {
     color: #e74c3c;
     font-weight: bold;

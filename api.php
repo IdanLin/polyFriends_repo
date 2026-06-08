@@ -113,7 +113,7 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    if ($action === 'join_bet') {
+    if ($action === 'lock_bet') {
         try {
             $stmt = $pdo->prepare("INSERT INTO bet_participants (bet_id, username, option_name) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE option_name=VALUES(option_name)");
             $stmt->execute([$data['betId'], $data['username'], $data['option']]);

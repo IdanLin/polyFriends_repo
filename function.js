@@ -1,6 +1,7 @@
 let appData = { users: [], categories: [], bets: [], admins: [], settlements: [], messages: [] };
 let currentUser = null;
 let authMode = 'login';
+let localSelections = {};
 
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
@@ -283,25 +284,55 @@ window.renderMarkets = function() {
         if(searchQuery && !bet.title.toLowerCase().includes(searchQuery)) return;
         if(catFilter && bet.category !== catFilter) return;
         
-        let hasJoined = currentUser && bet.participants[currentUser.username];
-        
+        let lockedChoice = currentUser && bet.participants[currentUser.username];
+        let hasJoined = lockedChoice || (currentUser && localSelections[bet.id]);
+        let isLocked = !!lockedChoice;
+
+        // Stats bar
+        const totalVotes = Object.keys(bet.participants).length;
+        let statsHtml = '';
+        if (bet.options.length === 2) {
+            const count0 = Object.values(bet.participants).filter(o => o === bet.options[0]).length;
+            const count1 = totalVotes - count0;
+            const pct0 = totalVotes > 0 ? Math.round((count0 / totalVotes) * 100) : 50;
+            const pct1 = 100 - pct0;
+            statsHtml = `
+                <div class="vote-bar-wrapper">
+                    <div class="vote-bar">
+                        <div class="vote-bar-left" style="width:${pct0}%"></div>
+                        <div class="vote-bar-right" style="width:${pct1}%"></div>
+                    </div>
+                    <div class="vote-bar-labels">
+                        <span>${bet.options[0]} ${pct0}%</span>
+                        <span>${pct1}% ${bet.options[1]}</span>
+                    </div>
+                </div>`;
+        }
+
         let buttonsHtml = '';
         if (bet.status === 'closed') {
             const winText = bet.winningOption ? `המנצח: ${bet.winningOption}` : 'נסגר ללא הכרעה';
             buttonsHtml = `<div class="closed-bet-notice">התערבות סגורה.<br>${winText}</div>`;
         } else {
             if (currentUser) {
-                buttonsHtml = bet.options.map(opt => {
-                    const isSelected = hasJoined === opt;
-                    const btnClass = isSelected ? 'btn-selected' : 'btn-unselected';
-                    return `<button class="auth-btn bet-option-btn ${btnClass}" onclick="joinBet('${bet.id}', '${opt}')">${opt}</button>`;
-                }).join('');
-                buttonsHtml = `<div class="bet-options-wrapper">${buttonsHtml}</div>`;
+                if (isLocked) {
+                    buttonsHtml = `<div class="locked-choice-notice">בחרת ב ${lockedChoice} 🔒</div>`;
+                } else {
+                    const optBtns = bet.options.map(opt => {
+                        const isSelected = hasJoined === opt;
+                        const btnClass = isSelected ? 'btn-selected' : 'btn-unselected';
+                        return `<button class="auth-btn bet-option-btn ${btnClass}" onclick="joinBet('${bet.id}', '${opt}')">${opt}</button>`;
+                    }).join('');
+                    buttonsHtml = `<div class="bet-options-wrapper">${optBtns}</div>`;
+                    if (hasJoined) {
+                        buttonsHtml += `<button class="auth-btn lock-btn" onclick="lockBet('${bet.id}')">🔒 נעל בחירה</button>`;
+                    }
+                }
             } else {
                 buttonsHtml = `<button class="auth-btn" style="width:100%;padding:10px;" onclick="document.getElementById('authModal').style.display='flex'">התחבר כדי להשתתף</button>`;
             }
         }
-        
+
         let potAmount = Object.keys(bet.participants).length * bet.amount;
         let creatorUser = appData.users.find(u => u.username === bet.creator);
         let creatorName = creatorUser ? creatorUser.fullName : bet.creator;
@@ -313,6 +344,7 @@ window.renderMarkets = function() {
                 <h4>${bet.category}</h4>
                 <p style="font-size:0.85em;color:#aaa;margin:0 0 10px 0;">👤 ${creatorName}</p>
                 <p>סכום השתתפות: ₪${bet.amount}</p>
+                ${statsHtml}
             </div>
             <div>
                 <h4>קופה נוכחית: ₪${potAmount}</h4>
@@ -323,18 +355,26 @@ window.renderMarkets = function() {
     container.innerHTML = html || '<p style="text-align:center; width:100%;">לא נמצאו התערבויות העונות לסינון.</p>';
 }
 
-window.joinBet = async function(betId, option) {
+window.joinBet = function(betId, option) {
+    localSelections[betId] = option;
+    renderMarkets();
+}
+
+window.lockBet = async function(betId) {
+    const option = localSelections[betId];
+    if (!option) return;
     try {
-        const res = await fetch('api.php?action=join_bet', {
+        const res = await fetch('api.php?action=lock_bet', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ betId, username: currentUser.username, option })
         });
         if (!res.ok) throw new Error((await res.json()).message || 'שגיאת שרת');
+        delete localSelections[betId];
         const fresh = await fetch('api.php');
         appData = await fresh.json();
     } catch(e) {
-        alert('שגיאה בהצטרפות להימור: ' + e.message);
+        alert('שגיאה בנעילת הבחירה: ' + e.message);
     }
     renderMarkets();
 }
