@@ -113,12 +113,100 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($action === 'add_funds') {
+        try {
+            $amount = (float)$data['amount'];
+            if ($amount <= 0) { http_response_code(400); echo json_encode(['status' => 'error', 'message' => 'invalid_amount']); exit; }
+
+            $stmtBal = $pdo->prepare("SELECT balance FROM users WHERE username = ?");
+            $stmtBal->execute([$data['username']]);
+            $currentBalance = (float)$stmtBal->fetchColumn();
+
+            if ($currentBalance + $amount > 10000) {
+                $allowed = round(10000 - $currentBalance, 2);
+                http_response_code(400);
+                echo json_encode(['status' => 'error', 'message' => 'max_exceeded', 'allowed' => $allowed]);
+                exit;
+            }
+
+            $pdo->prepare("UPDATE users SET balance = balance + ? WHERE username = ?")->execute([$amount, $data['username']]);
+            $stmtBal->execute([$data['username']]);
+            echo json_encode(['status' => 'success', 'newBalance' => (float)$stmtBal->fetchColumn()]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     if ($action === 'lock_bet') {
         try {
-            $stmt = $pdo->prepare("INSERT INTO bet_participants (bet_id, username, option_name) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE option_name=VALUES(option_name)");
-            $stmt->execute([$data['betId'], $data['username'], $data['option']]);
+            $stmtBet = $pdo->prepare("SELECT amount FROM bets WHERE id = ?");
+            $stmtBet->execute([$data['betId']]);
+            $betAmount = (float)$stmtBet->fetchColumn();
+
+            $stmtBal = $pdo->prepare("SELECT balance FROM users WHERE username = ?");
+            $stmtBal->execute([$data['username']]);
+            $balance = (float)$stmtBal->fetchColumn();
+
+            if ($balance < $betAmount) {
+                http_response_code(400);
+                echo json_encode(['status' => 'error', 'message' => 'insufficient_funds']);
+                exit;
+            }
+
+            $pdo->beginTransaction();
+            $pdo->prepare("INSERT INTO bet_participants (bet_id, username, option_name) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE option_name=VALUES(option_name)")->execute([$data['betId'], $data['username'], $data['option']]);
+            $pdo->prepare("UPDATE users SET balance = balance - ? WHERE username = ?")->execute([$betAmount, $data['username']]);
+            $pdo->commit();
             echo json_encode(['status' => 'success']);
         } catch (Exception $e) {
+            $pdo->rollBack();
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    if ($action === 'close_bet') {
+        try {
+            $betId = $data['betId'];
+            $winningOption = $data['winningOption'];
+
+            $stmtAmount = $pdo->prepare("SELECT amount FROM bets WHERE id=?");
+            $stmtAmount->execute([$betId]);
+            $betAmount = (float)$stmtAmount->fetchColumn();
+
+            $stmtParts = $pdo->prepare("SELECT username, option_name FROM bet_participants WHERE bet_id=?");
+            $stmtParts->execute([$betId]);
+            $participants = $stmtParts->fetchAll();
+
+            $winners = [];
+            $losers  = [];
+            foreach ($participants as $p) {
+                if ($p['option_name'] === $winningOption) $winners[] = $p;
+                else $losers[] = $p;
+            }
+
+            $pdo->beginTransaction();
+            $pdo->prepare("UPDATE bets SET status='closed', winning_option=? WHERE id=?")->execute([$winningOption, $betId]);
+
+            $stmtCredit = $pdo->prepare("UPDATE users SET balance = balance + ? WHERE username = ?");
+
+            if (count($winners) === 0 || count($losers) === 0) {
+                foreach ($participants as $p) {
+                    $stmtCredit->execute([$betAmount, $p['username']]);
+                }
+            } else {
+                $winShare = round((count($losers) * $betAmount) / count($winners), 2);
+                foreach ($winners as $w) {
+                    $stmtCredit->execute([$betAmount + $winShare, $w['username']]);
+                }
+            }
+            $pdo->commit();
+            echo json_encode(['status' => 'success']);
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
@@ -153,7 +241,7 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->beginTransaction();
             
             // 1. שמירת משתמשים
-            $stmtUser = $pdo->prepare("INSERT INTO users (username, password, full_name, balance) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE full_name=VALUES(full_name), balance=VALUES(balance), password=VALUES(password)");
+            $stmtUser = $pdo->prepare("INSERT INTO users (username, password, full_name, balance) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE full_name=VALUES(full_name), password=VALUES(password)");
             foreach ($data['users'] as $u) {
                 $stmtUser->execute([$u['username'], $u['password'], $u['fullName'], $u['balance']]);
             }

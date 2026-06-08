@@ -17,7 +17,11 @@ async function initApp() {
         appData = await response.json();
         
         let storedUser = localStorage.getItem('currentUser');
-        if (storedUser) currentUser = JSON.parse(storedUser);
+        if (storedUser) {
+            currentUser = JSON.parse(storedUser);
+            const fresh = appData.users.find(u => u.username === currentUser.username);
+            if (fresh) currentUser = fresh;
+        }
     } catch(e) {
         console.error("Error initializing app", e);
         alert("שגיאה בטעינת הנתונים: " + e.message + "\n(כנראה שפרטי החיבור למסד הנתונים ב-api.php שגויים)");
@@ -29,6 +33,8 @@ async function initApp() {
     // בניית הממשק מחוץ ל-try-catch כדי להבטיח שיופיע תמיד
     buildNav();
     buildAuthModal();
+    buildAddFundsModal();
+    buildCloseBetModal();
     buildFooter();
 
     const path = window.location.pathname;
@@ -97,8 +103,11 @@ function buildNav() {
             </div>
             <input type="search" placeholder="חיפוש התערבויות..." id="globalSearch" oninput="handleSearchInput()" onkeypress="if(event.key==='Enter') window.location.href='markets.html?q='+encodeURIComponent(this.value)">
             <div class="auth-section">
-                ${currentUser 
-                    ? `<span class="user-greeting">שלום, ${currentUser.fullName}</span><button class="auth-btn" onclick="logout()">התנתק</button>` 
+                ${currentUser
+                    ? `<span class="user-greeting">שלום, ${currentUser.fullName}</span>
+                       <span class="balance-nav-badge">₪${Math.round(currentUser.balance * 100) / 100}</span>
+                       <button class="auth-btn add-funds-btn" onclick="document.getElementById('addFundsModal').style.display='flex'">+ הוסף כסף</button>
+                       <button class="auth-btn" onclick="logout()">התנתק</button>`
                     : `<button class="auth-btn" onclick="document.getElementById('authModal').style.display='flex'">התחבר / הירשם</button>`}
             </div>
         </div>
@@ -157,6 +166,61 @@ function buildAuthModal() {
         </div>
     </div>`;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function buildCloseBetModal() {
+    if (document.getElementById('closeBetModal')) return;
+    document.body.insertAdjacentHTML('beforeend', `
+    <div id="closeBetModal" class="modal-overlay" style="display:none;">
+        <div class="modal-content">
+            <span class="close-btn" onclick="document.getElementById('closeBetModal').style.display='none'">&times;</span>
+            <h2>סגור התערבות</h2>
+            <p id="closeBetTitle" style="color:#555; margin-bottom:15px;"></p>
+            <p style="font-weight:bold; margin-bottom:10px;">מי ניצח?</p>
+            <div id="closeBetOptions" style="display:flex; gap:12px; justify-content:center;"></div>
+        </div>
+    </div>`);
+}
+
+function buildAddFundsModal() {
+    if (document.getElementById('addFundsModal')) return;
+    document.body.insertAdjacentHTML('beforeend', `
+    <div id="addFundsModal" class="modal-overlay" style="display:none;">
+        <div class="modal-content">
+            <span class="close-btn" onclick="document.getElementById('addFundsModal').style.display='none'">&times;</span>
+            <h2>הוסף כסף לחשבון</h2>
+            <p id="currentBalanceDisplay" style="color:#555;"></p>
+            <input type="number" id="addFundsAmount" placeholder="סכום להוספה (מקסימום ₪10,000)" min="1" max="10000" style="margin-top:10px;">
+            <button class="auth-btn modal-submit-btn" onclick="addFunds()">הוסף</button>
+        </div>
+    </div>`);
+}
+
+window.addFunds = async function() {
+    const amount = parseFloat(document.getElementById('addFundsAmount').value);
+    if (isNaN(amount) || amount <= 0) return alert('נא להזין סכום תקין.');
+    try {
+        const res = await fetch('api.php?action=add_funds', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: currentUser.username, amount })
+        });
+        const result = await res.json();
+        if (result.status === 'success') {
+            currentUser.balance = result.newBalance;
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            document.getElementById('addFundsModal').style.display = 'none';
+            document.getElementById('addFundsAmount').value = '';
+            buildNav();
+            alert(`הסכום התווסף! יתרה חדשה: ₪${result.newBalance}`);
+        } else if (result.message === 'max_exceeded') {
+            alert(`לא ניתן להוסיף סכום זה. ניתן להוסיף עוד עד ₪${result.allowed} (מגבלה: ₪10,000).`);
+        } else {
+            alert('שגיאה: ' + result.message);
+        }
+    } catch(e) {
+        alert('שגיאה בהוספת כסף: ' + e.message);
+    }
 }
 
 window.toggleAuthMode = function() {
@@ -363,16 +427,27 @@ window.joinBet = function(betId, option) {
 window.lockBet = async function(betId) {
     const option = localSelections[betId];
     if (!option) return;
+    const bet = appData.bets.find(b => b.id === betId);
+    if (currentUser.balance < bet.amount) {
+        return alert(`אין מספיק כסף! היתרה שלך: ₪${currentUser.balance}. נדרש: ₪${bet.amount}. הוסף כסף דרך כפתור "+ הוסף כסף".`);
+    }
     try {
         const res = await fetch('api.php?action=lock_bet', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ betId, username: currentUser.username, option })
         });
-        if (!res.ok) throw new Error((await res.json()).message || 'שגיאת שרת');
+        const result = await res.json();
+        if (result.status !== 'success') {
+            if (result.message === 'insufficient_funds') return alert('אין מספיק כסף בחשבון!');
+            throw new Error(result.message || 'שגיאת שרת');
+        }
         delete localSelections[betId];
         const fresh = await fetch('api.php');
         appData = await fresh.json();
+        const updatedUser = appData.users.find(u => u.username === currentUser.username);
+        if (updatedUser) { currentUser = updatedUser; localStorage.setItem('currentUser', JSON.stringify(currentUser)); }
+        buildNav();
     } catch(e) {
         alert('שגיאה בנעילת הבחירה: ' + e.message);
     }
@@ -412,6 +487,41 @@ window.renderManageBets = function() {
                 <button onclick="closeBet('${bet.id}')">סגור התערבות</button>
             </div>
         `).join('');
+    }
+
+    // Bet history
+    const historyContainer = document.getElementById('bet-history-container');
+    if (!historyContainer) return;
+    const myHistory = appData.bets.filter(b => b.status === 'closed' && b.participants && b.participants[currentUser.username]);
+    if (myHistory.length === 0) {
+        historyContainer.innerHTML = '<p style="text-align:center; width:100%;">אין היסטוריית הימורים עדיין.</p>';
+    } else {
+        historyContainer.innerHTML = myHistory.map(bet => {
+            const myChoice = bet.participants[currentUser.username];
+            const won = bet.winningOption && myChoice === bet.winningOption;
+            const voided = !bet.winningOption || Object.keys(bet.participants).length === 0;
+            const numWinners = Object.values(bet.participants).filter(o => o === bet.winningOption).length;
+            const numLosers = Object.keys(bet.participants).length - numWinners;
+            let amountText = '';
+            if (voided) {
+                amountText = '₪0 (בוטל)';
+            } else if (won) {
+                const winShare = numWinners > 0 ? Math.round((numLosers * bet.amount / numWinners) * 100) / 100 : 0;
+                amountText = `+₪${winShare}`;
+            } else {
+                amountText = `-₪${bet.amount}`;
+            }
+            const resultClass = voided ? 'balance-zero' : (won ? 'balance-positive' : 'balance-negative');
+            const resultIcon = voided ? '🤝' : (won ? '🏆' : '😔');
+            return `
+                <div class="market-card" style="text-align:center; display:flex; flex-direction:column; gap:8px;">
+                    <h3 style="margin:0;">${bet.title}</h3>
+                    <p style="margin:0; color:#888; font-size:0.85em;">${bet.category}</p>
+                    <p style="margin:0;">הבחירה שלך: <strong>${myChoice}</strong></p>
+                    <p style="margin:0;">תוצאה: <strong>${bet.winningOption || 'בוטל'}</strong></p>
+                    <div class="balance-badge ${resultClass}">${resultIcon} ${amountText}</div>
+                </div>`;
+        }).join('');
     }
 }
 
@@ -477,155 +587,48 @@ window.createBet = async function(e) {
     }
 }
 
-window.closeBet = async function(betId) {
-    let bet = appData.bets.find(b => b.id === betId);
-    let winningOption = prompt(`מי ניצח בהתערבות "${bet.title}"?\nהקלד אחת מהאפשרויות: ${bet.options.join(' / ')}`);
-    if(!winningOption || !bet.options.includes(winningOption)) return alert('בחירה לא תקינה או בוטלה.');
-    
-    bet.status = 'closed';
-    bet.winningOption = winningOption;
-    updateBalances();
-    await saveData();
-    renderManageBets();
-    alert('התערבות נסגרה בהצלחה! המאזנים התעדכנו אוטומטית.');
+window.closeBet = function(betId) {
+    const bet = appData.bets.find(b => b.id === betId);
+    const modal = document.getElementById('closeBetModal');
+    document.getElementById('closeBetTitle').textContent = bet.title;
+    const optionsDiv = document.getElementById('closeBetOptions');
+    optionsDiv.innerHTML = bet.options.map(opt =>
+        `<button class="auth-btn" style="flex:1; padding:10px;" onclick="confirmCloseBet('${betId}', '${opt.replace(/'/g, "\\'")}')">${opt}</button>`
+    ).join('');
+    modal.style.display = 'flex';
 }
 
-window.updateBalances = function() {
-    appData.users.forEach(u => {
-        u.balance = 0;
-        u.debts = {}; // מאזן פנימי מול כל משתמש
-    });
-    appData.bets.forEach(bet => {
-        if(bet.status === 'closed' && bet.winningOption) {
-            let winners = [];
-            let losers = [];
-            for(let [uname, opt] of Object.entries(bet.participants)) {
-                // שומרים גם את סכום ההימור למקרה של סכומים שונים למשתמשים
-                if(opt === bet.winningOption) winners.push({ username: uname, amount: bet.amount });
-                else losers.push({ username: uname, amount: bet.amount });
-            }
-            
-            // 4. מקרי קצה (Void) - אם כולם צדקו או כולם טעו, ההתערבות מבוטלת
-            if (winners.length === 0 || losers.length === 0) {
-                return;
-            }
-
-            // 1. קופת מפסידים - סכום כל ההימורים של מי שטעה
-            let losersPot = losers.reduce((sum, l) => sum + l.amount, 0);
-            
-            // סך כל סכומי ההימור של המנצחים (לצורך חישוב יחסי)
-            let totalWinnersAmount = winners.reduce((sum, w) => sum + w.amount, 0);
-
-            // 3. חלוקת רווחים למנצחים (באופן יחסי לסכום שסיכנו)
-            winners.forEach(w => {
-                let u = appData.users.find(x => x.username === w.username);
-                if (u) {
-                    let winShare = (w.amount / totalWinnersAmount) * losersPot;
-                    u.balance += Math.round(winShare * 100) / 100;
-                }
-            });
-
-            // 2. עדכון חובות המפסידים (מפחיתים את סכום ההימור מהמאזן)
-            losers.forEach(l => {
-                let u = appData.users.find(x => x.username === l.username);
-                if (u) u.balance -= l.amount;
-            });
-
-            // עדכון חובות פרטניים (מי חייב למי) בהתאמה לחלוקה היחסית
-            winners.forEach(w => {
-                let wUser = appData.users.find(x => x.username === w.username);
-                losers.forEach(l => {
-                    let lUser = appData.users.find(x => x.username === l.username);
-                    let amountOwed = l.amount * (w.amount / totalWinnersAmount);
-                    amountOwed = Math.round(amountOwed * 100) / 100;
-
-                    if (wUser) wUser.debts[l.username] = (wUser.debts[l.username] || 0) + amountOwed;
-                    if (lUser) lUser.debts[w.username] = (lUser.debts[w.username] || 0) - amountOwed;
-                });
-            });
-        }
-    });
-    
-    // החלת דיווחי תשלומים (החזרי חובות) מהיסטוריית המערכת
-    if (!appData.settlements) appData.settlements = [];
-    appData.settlements.forEach(s => {
-        let debtor = appData.users.find(u => u.username === s.from);
-        let creditor = appData.users.find(u => u.username === s.to);
-        
-        if (debtor) {
-            debtor.balance += s.amount;
-            debtor.debts[s.to] = (debtor.debts[s.to] || 0) + s.amount;
-        }
-        if (creditor) {
-            creditor.balance -= s.amount;
-            creditor.debts[s.from] = (creditor.debts[s.from] || 0) - s.amount;
-        }
-    });
+window.confirmCloseBet = async function(betId, winningOption) {
+    document.getElementById('closeBetModal').style.display = 'none';
+    try {
+        const res = await fetch('api.php?action=close_bet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ betId, winningOption })
+        });
+        const closeResult = await res.json();
+        if (closeResult.status !== 'success') throw new Error(closeResult.message || 'שגיאת שרת');
+        const fresh = await fetch('api.php');
+        appData = await fresh.json();
+        const updatedUser = appData.users.find(u => u.username === currentUser.username);
+        if (updatedUser) { currentUser = updatedUser; localStorage.setItem('currentUser', JSON.stringify(currentUser)); }
+        buildNav();
+        renderManageBets();
+        alert('התערבות נסגרה בהצלחה! הזכיות זוכו אוטומטית.');
+    } catch(e) {
+        alert('שגיאה בסגירת ההימור: ' + e.message);
+    }
 }
 
 // 3. Ledger (Participants)
-window.renderLedger = async function() {
+window.renderLedger = function() {
     const container = document.getElementById('ledger-container');
     if (!container) return;
-    
-    updateBalances();
 
-    await saveData(); // Save computed balances
-    
     container.innerHTML = appData.users.map(user => {
-        let displayBalance = Math.round(user.balance * 100) / 100;
-        let bClass = displayBalance > 0 ? 'balance-positive' : (displayBalance < 0 ? 'balance-negative' : 'balance-zero');
-        let balanceDesc = displayBalance > 0 ? 'בפלוס (רווח)' : (displayBalance < 0 ? 'במינוס (חוב)' : 'מאוזן');
-        let absTotal = Math.abs(displayBalance);
+        let balance = Math.round((user.balance || 0) * 100) / 100;
+        let bClass = balance > 0 ? 'balance-positive' : (balance < 0 ? 'balance-negative' : 'balance-zero');
 
-        let debtsHtml = '';
-        if (user.debts && Object.keys(user.debts).length > 0) {
-            let debtRows = '';
-            for (let [otherUser, amount] of Object.entries(user.debts)) {
-                let displayAmount = Math.round(amount * 100) / 100;
-                if (displayAmount !== 0) {
-                    let isMe = currentUser && user.username === currentUser.username;
-                    let otherUserObj = appData.users.find(u => u.username === otherUser);
-                    let otherName = otherUserObj ? otherUserObj.fullName : otherUser;
-                    let absAmount = Math.abs(displayAmount);
-                    
-                    let color = displayAmount > 0 ? '#2ecc71' : '#e74c3c';
-                    let desc = '';
-                    
-                    let settleBtn = '';
-                    
-                    if (displayAmount > 0) {
-                        // משתמש אחר חייב כסף ליוזר הנוכחי של הכרטיסייה
-                        desc = isMe ? 'חייב/ת לך' : `חייב/ת ל${user.fullName}`;
-                        if (isMe) {
-                            // רק אם אני מסתכל על הכרטיסייה שלי ומישהו חייב לי - אוכל לסמן שהחזיר לי
-                            settleBtn = `<button onclick="settleDebt('${otherUser}', ${absAmount})" style="font-size:0.75em; padding:4px 10px; margin-right:10px; background:#2ecc71; color:white; border:none; border-radius:12px; cursor:pointer; font-weight:bold;">סמן שהחזיר לי</button>`;
-                        }
-                    } else {
-                        // היוזר הנוכחי של הכרטיסייה חייב כסף למשתמש אחר
-                        desc = isMe ? `אתה חייב/ת ל${otherName}` : `${user.fullName} חייב/ת ל${otherName}`;
-                        // אין פה כפתור! רק מי שמקבל את הכסף יכול לדווח שהוא קיבל אותו
-                    }
-                    
-                    debtRows += `
-                        <div class="debt-row" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
-                            <div class="debt-user" style="display: flex; align-items: center;">
-                                <span style="font-weight: bold; font-size: 1.1em;">${otherName}</span>
-                                ${settleBtn}
-                            </div>
-                            <span style="color: ${color}; font-weight: bold;">${desc} ${absAmount} ₪</span>
-                        </div>`;
-                }
-            }
-            if (debtRows) {
-                debtsHtml = `
-                    <div class="debts-wrapper" style="margin-top: 15px; background: #fafafa; padding: 10px; border-radius: 8px;">
-                        <h4 style="margin-top: 0; margin-bottom: 10px; color: #333; border-bottom: 2px solid #e0e0e0; padding-bottom: 5px;">פירוט חובות פנימי:</h4>
-                        ${debtRows}
-                    </div>`;
-            }
-        }
-        
         return `
             <div class="market-card" style="margin-bottom: 20px; padding: 20px;">
                 <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
@@ -635,43 +638,11 @@ window.renderLedger = async function() {
                         <h4 style="margin: 0; color: #7f8c8d;">@${user.username}</h4>
                     </div>
                 </div>
-                <div class="balance-badge ${bClass}" style="display: inline-block; padding: 8px 12px; border-radius: 20px; font-weight: bold; margin-bottom: 10px;">
-                    סך הכל: ${balanceDesc} ${absTotal} ₪
-                </div>
-                ${debtsHtml}
+                <div class="balance-badge ${bClass}">יתרה: ₪${balance}</div>
             </div>`;
     }).join('');
 }
 
-window.settleDebt = async function(debtorUsername, maxAmount) {
-    if (!currentUser) return;
-    
-    let debtorObj = appData.users.find(u => u.username === debtorUsername);
-    let debtorName = debtorObj ? debtorObj.fullName : debtorUsername;
-    
-    let amountStr = prompt(`כמה כסף ${debtorName} החזיר לך?\n(הזן סכום עד ${maxAmount} ₪)`, maxAmount);
-    if (!amountStr) return; // המשתמש ביטל את הפעולה
-    
-    let amount = parseFloat(amountStr);
-    if (isNaN(amount) || amount <= 0) {
-        return alert('אנא הזן סכום תקין וגדול מאפס.');
-    }
-    if (amount > maxAmount) {
-        return alert('לא ניתן להזין סכום שגדול מהחוב הקיים.');
-    }
-    
-    if (!appData.settlements) appData.settlements = [];
-    appData.settlements.push({
-        from: debtorUsername,
-        to: currentUser.username,
-        amount: amount,
-        timestamp: Date.now()
-    });
-    
-    await saveData();
-    renderLedger(); // רינדור מחדש להצגת המאזנים המעודכנים
-    alert('התשלום דווח והמאזנים עודכנו בהצלחה!');
-}
 
 // 4. Contact / Admins
 window.renderContact = function() {
