@@ -28,7 +28,7 @@
     <h1>צור קשר</h1>
     <div class="standalone-form">
         <div class="market-card">
-            <form id="contactForm" action="mailto:sahar.guy@gmail.com" method="post" enctype="text/plain">
+            <form id="contactForm">
 
                 <p>
                     <label>שם מלא <span class="required-star">*</span></label>
@@ -146,7 +146,7 @@
     <footer id="main-footer"></footer>
 
     <script>
-        document.getElementById('contactForm').addEventListener('submit', function(e) {
+        document.getElementById('contactForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
             const form = this;
@@ -190,10 +190,24 @@
 
             const bodyText = `${message}\n\n---\nContact Information:\n${contactLines}`;
 
-            const mailSubject = encodeURIComponent(`${subjectText} - ${fullname}`);
-            const mailBody    = encodeURIComponent(bodyText);
+            const mailSubject = `${subjectText} - ${fullname}`;
 
-            window.location.href = `mailto:sahar.guy@gmail.com?subject=${mailSubject}&body=${mailBody}`;
+            try {
+                const response = await fetch('api.php?action=send_email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subject: mailSubject, message: bodyText, replyTo: email })
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    alert('הפנייה נשלחה בהצלחה לצוות האתר!');
+                    form.reset();
+                } else {
+                    alert('שגיאה בשליחת המייל: ' + result.message);
+                }
+            } catch (error) {
+                alert('שגיאת תקשורת מול השרת. המייל לא נשלח.');
+            }
         });
     </script>
 </body>

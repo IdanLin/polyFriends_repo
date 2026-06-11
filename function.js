@@ -291,6 +291,7 @@ function buildFooter() {
                 <a href="team.html">צוות האתר</a>
                 <a href="payout_calc.html">מחשבון זכיות</a>
                 <a href="contact.html">צור קשר</a>
+                <a href="table.php">טבלת הודעות (DB)</a>
             </div>
             <div class="footer-input">
                 <h4>השאר לנו הודעה / הרשם לעדכונים</h4>
@@ -526,26 +527,20 @@ window.renderManageBets = function() {
 }
 
 window.checkCustomCat = function() {
-    let wrapper = document.getElementById('customCategoryWrapper');
     let select = document.getElementById('categorySelect');
     if (!select) return;
     
-    // יצירה דינאמית של השדה במקרה שהוא חסר ב-HTML
-    if (!wrapper) {
-        wrapper = document.createElement('div');
-        wrapper.id = 'customCategoryWrapper';
-        // הוספנו עיצוב ברור כדי לוודא שהשדה בולט ולא נדרס על ידי ה-CSS
-        wrapper.innerHTML = '<input type="text" id="customCategory" placeholder="הקלד קטגוריה חדשה (למשל: אוכל, סרטים)..." style="margin-top: 15px; padding: 10px; width: 100%; box-sizing: border-box; border: 2px solid #3498db; border-radius: 6px; font-size: 1rem; transition: border-color 0.3s;">';
-        select.parentNode.insertBefore(wrapper, select.nextSibling);
-    }
-    
-    if (wrapper) {
-        let isOther = select.value === 'other';
-        wrapper.style.display = isOther ? 'block' : 'none';
-        let customInput = document.getElementById('customCategory');
-        if (customInput) {
-            customInput.required = isOther; // השדה יהיה שדה חובה רק אם נבחר "אחר"
-            if (isOther) customInput.focus(); // הקפצת הסמן ישר לשדה הטקסט החדש
+    // שימוש ב-window.prompt להוספת קטגוריה חדשה בקלות
+    if (select.value === 'other') {
+        let newCat = window.prompt("הזן קטגוריה חדשה (למשל: אוכל, סרטים):");
+        if (newCat && newCat.trim() !== "") {
+            let opt = document.createElement('option');
+            opt.value = newCat.trim();
+            opt.text = newCat.trim();
+            select.insertBefore(opt, select.lastElementChild); // מוסיף לפני בחירת ה"אחר"
+            select.value = newCat.trim();
+        } else {
+            select.value = ""; // איפוס בחירה אם בוטל
         }
     }
 }
@@ -556,9 +551,6 @@ window.createBet = async function(e) {
     let title = document.getElementById('betTitle').value;
     let amount = parseInt(document.getElementById('betAmount').value);
     let cat = document.getElementById('categorySelect').value;
-    if(cat === 'other') {
-        cat = document.getElementById('customCategory').value.trim();
-    }
 
     let opt1 = document.getElementById('betOption1').value.trim();
     let opt2 = document.getElementById('betOption2').value.trim();

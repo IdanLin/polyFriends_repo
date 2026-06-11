@@ -263,6 +263,32 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($action === 'send_email') {
+        try {
+            $to = 'sahar.guy@gmail.com'; // המייל של הצוות שאליו תישלח ההודעה
+            $subject = $data['subject'] ?? 'הודעה חדשה מטופס צור קשר';
+            $message = $data['message'] ?? '';
+            $replyTo = $data['replyTo'] ?? '';
+            
+            $headers = "From: noreply@polyfriends.com\r\n";
+            if (!empty($replyTo)) {
+                $headers .= "Reply-To: $replyTo\r\n";
+            }
+            $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+
+            if (mail($to, $subject, $message, $headers)) {
+                echo json_encode(['status' => 'success', 'message' => 'Email sent successfully']);
+            } else {
+                http_response_code(500);
+                echo json_encode(['status' => 'error', 'message' => 'Failed to send email from server']);
+            }
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     if ($data !== null) {
         try {
             $pdo->beginTransaction();

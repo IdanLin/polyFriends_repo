@@ -17,9 +17,6 @@
             <form id="createBetForm" onsubmit="createBet(event)">
                 <input type="text" id="betTitle" placeholder="כותרת ההימור" required>
                 <select id="categorySelect" required onchange="checkCustomCat()"></select>
-                <div id="customCategoryWrapper" class="hidden">
-                    <input type="text" id="customCategory" placeholder="הזן קטגוריה חדשה">
-                </div>
                 <div>
                     <input type="text" id="betOption1" placeholder="אופציה א' (למשל: טראמפ)" required>
                     <input type="text" id="betOption2" placeholder="אופציה ב' (למשל: ביידן)" required>
