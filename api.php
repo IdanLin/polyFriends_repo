@@ -368,7 +368,7 @@ function createBet($conn, $data) {
  */
 function sendContactEmail($data) {
     try {
-        $to = 'sahar.guy@gmail.com';
+        $to = 'idanlin97@gmail.com';
         $subject = $data['subject'] ?? 'הודעה חדשה מטופס צור קשר';
         $message = $data['message'] ?? '';
         $replyTo = $data['replyTo'] ?? '';

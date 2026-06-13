@@ -28,7 +28,7 @@
     <h1>צור קשר</h1>
     <div class="standalone-form">
         <div class="market-card">
-            <form id="contactForm">
+            <form id="contactForm"> <!-- Contact Form  -->
 
                 <p>
                     <label>שם מלא <span class="required-star">*</span></label>
@@ -78,8 +78,8 @@
                 </p>
 
                 <p>
-                    <label>גיל (10–20, קפיצות של 2):</label>
-                    <input type="number" name="age" min="10" max="20" step="2">
+                    <label>גיל (18–100):</label>
+                    <input type="number" name="age" min="18" max="100" step="1">
                 </p>
 
                 <p>
@@ -146,6 +146,7 @@
     <footer id="main-footer"></footer>
 
     <script>
+        //Contact Form Script - When someone submits the form
         document.getElementById('contactForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
