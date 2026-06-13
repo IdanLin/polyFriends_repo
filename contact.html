@@ -174,41 +174,48 @@
             const message = form.querySelector('textarea[name="message"]').value.trim();
 
             const fullname = form.querySelector('input[name="fullname"]').value.trim();
-            const email    = form.querySelector('input[name="email"]').value.trim();
-            const phone    = form.querySelector('input[name="phone"]').value.trim();
-            const area     = form.querySelector('select[name="area"]');
-            const areaText = area ? area.options[area.selectedIndex].text : '';
 
             const subjectVal = form.querySelector('input[name="subject"]:checked');
             const subjectText = subjectVal ? (subjectLabels[subjectVal.value] || subjectVal.value) : '';
 
-            const contactLines = [
-                `Full Name: ${fullname}`,
-                email ? `Email: ${email}` : null,
-                phone ? `Phone: ${phone}` : null,
-                `Area: ${areaText}`
-            ].filter(Boolean).join('\n');
+            const contactLines = [];
+            
+            for (const [key, label] of Object.entries(labelMap)) {
+                if (key === 'message') continue;
+                
+                let value = '';
+                if (key === 'subject') {
+                    value = subjectText;
+                } else if (key === 'area') {
+                    const area = form.querySelector('select[name="area"]');
+                    value = area ? area.options[area.selectedIndex].text : '';
+                } else if (key === 'attachments') {
+                    const fileInput = form.querySelector('input[name="attachments"]');
+                    if (fileInput && fileInput.files.length > 0) {
+                        value = Array.from(fileInput.files).map(f => f.name).join(', ');
+                    }
+                } else {
+                    const el = form.querySelector(`[name="${key}"]`);
+                    if (el) value = el.value.trim();
+                }
 
-            const bodyText = `${message}\n\n---\nContact Information:\n${contactLines}`;
+                if (value && value !== '') {
+                    contactLines.push(`${label}: ${value}`);
+                }
+            }
+
+            const bodyText = `${message}\n\n---\nפרטי הפנייה:\n${contactLines.join('\n')}`;
 
             const mailSubject = `${subjectText} - ${fullname}`;
 
-            try {
-                const response = await fetch('api.php?action=send_email', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ subject: mailSubject, message: bodyText, replyTo: email })
-                });
-                const result = await response.json();
-                if (result.status === 'success') {
-                    alert('הפנייה נשלחה בהצלחה לצוות האתר!');
-                    form.reset();
-                } else {
-                    alert('שגיאה בשליחת המייל: ' + result.message);
-                }
-            } catch (error) {
-                alert('שגיאת תקשורת מול השרת. המייל לא נשלח.');
-            }
+            // Generate a mailto link with pre-filled subject and body
+            const mailtoLink = `mailto:idanlin97@gmail.com?subject=${encodeURIComponent(mailSubject)}&body=${encodeURIComponent(bodyText)}`;
+            
+            // Open the default email client
+            window.location.href = mailtoLink;
+            
+            // Clear the form after opening the email client
+            form.reset();
         });
     </script>
 </body>

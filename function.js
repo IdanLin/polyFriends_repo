@@ -289,7 +289,6 @@ function buildFooter() {
                 <a href="markets.html">התערבויות פתוחות</a>
                 <a href="manage_bets.html">ניהול הימורים</a>
                 <a href="participants.html">משתתפים</a>
-                <a href="team.html">צוות האתר</a>
                 <a href="contact.html">צור קשר</a>
                 <a href="table.php">טבלת הודעות (DB)</a>
             </div>
