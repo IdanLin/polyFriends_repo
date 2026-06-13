@@ -1,51 +1,63 @@
+// ============================================================================
+// 1. GLOBAL STATE & INITIALIZATION
+// ============================================================================
 let appData = { users: [], categories: [], bets: [], admins: [], settlements: [], messages: [] };
 let currentUser = null;
 let authMode = 'login';
-let localSelections = {};
+let localSelections = {}; // Tracks temporary UI selections before locking a bet
 
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
 });
 
+/**
+ * Initializes the application.
+ * Fetches the current state from the database via api.php and restores user session.
+ */
 async function initApp() {
     try {
         const response = await fetch('api.php');
         if (!response.ok) {
             let errorData = await response.json();
-            throw new Error(errorData.message || "שגיאת שרת");
+            throw new Error(errorData.message || "Server Error");
         }
         appData = await response.json();
         
+        // Restore user session from localStorage
         let storedUser = localStorage.getItem('currentUser');
         if (storedUser) {
             currentUser = JSON.parse(storedUser);
+            // Refresh user data from the DB to get the latest balance
             const fresh = appData.users.find(u => u.username === currentUser.username);
             if (fresh) currentUser = fresh;
         }
     } catch(e) {
         console.error("Error initializing app", e);
-        alert("שגיאה בטעינת הנתונים: " + e.message + "\n(כנראה שפרטי החיבור למסד הנתונים ב-api.php שגויים)");
-        appData = { 
-            users: [], categories: ["פוליטיקה", "ספורט", "קריפטו", "תרבות פופ", "כלכלה", "מדע וטכנולוגיה"], bets: [], admins: [], settlements: [], messages: []
-        };
+        alert("שגיאה בטעינת הנתונים: " + e.message);
+        // Fallback to empty state to prevent UI crashes if DB fails
+        appData = { users: [], categories: [], bets: [], admins: [], settlements: [], messages: [] };
     }
 
-    // בניית הממשק מחוץ ל-try-catch כדי להבטיח שיופיע תמיד
+    // Build the global UI components (always visible)
     buildNav();
     buildAuthModal();
     buildAddFundsModal();
     buildCloseBetModal();
     buildFooter();
 
+    // Route to the appropriate renderer based on the current URL path
     const path = window.location.pathname;
     if (path.includes('markets.html')) renderMarkets();
     else if (path.includes('manage_bets.html')) renderManageBets();
     else if (path.includes('participants.html')) renderLedger();
     else if (path.includes('contact.html')) renderContact();
     else if (path.includes('team.html')) renderTeamPage();
-    else if (path.includes('payout_calc.html')) preparePayoutCalc();
 }
 
+/**
+ * Saves the entire application state (Fallback mass-sync).
+ * Primarily used for saving generic contact messages or new users.
+ */
 async function saveData() {
     try {
         const response = await fetch('api.php', {
@@ -63,7 +75,91 @@ async function saveData() {
     }
 }
 
-// ================= Nav & Auth UI =================
+// ============================================================================
+// 2. AUTHENTICATION & USER LOGIC
+// ============================================================================
+function toggleAuthMode() {
+    authMode = authMode === 'login' ? 'register' : 'login';
+    document.getElementById('authTitle').innerText = authMode === 'login' ? 'התחברות למערכת' : 'הרשמה למערכת';
+    document.getElementById('registerFields').classList.toggle('hidden', authMode === 'login');
+    document.getElementById('authToggleText').innerText = authMode === 'login' ? 'משתמש חדש? לחץ כאן להרשמה' : 'משתמש רשום? לחץ כאן להתחברות';
+}
+
+async function handleAuth(e) {
+    e.preventDefault();
+    let user = document.getElementById('authUser').value.trim();
+    let pass = document.getElementById('authPass').value.trim();
+    
+    if (authMode === 'login') {
+        let existing = appData.users.find(u => u.username === user);
+        if (existing) {
+            if (existing.password === pass) {
+                currentUser = existing;
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                window.location.reload();
+            } else {
+                alert('סיסמה שגויה!');
+            }
+        } else {
+            alert('משתמש לא קיים. מעביר למצב הרשמה...');
+            toggleAuthMode();
+            document.getElementById('authUser').value = user;
+            document.getElementById('authPass').value = pass;
+        }
+    } else {
+        let existing = appData.users.find(u => u.username === user);
+        if(existing) return alert('שם משתמש כבר תפוס!');
+        let fullName = document.getElementById('authFullName').value.trim();
+        
+        let newUser = { username: user, password: pass, fullName: fullName || user, balance: 0 };
+        appData.users.push(newUser);
+        currentUser = newUser;
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        
+        // Save the new user to the database
+        await saveData();
+        window.location.reload();
+    }
+}
+
+function logout() {
+    localStorage.removeItem('currentUser');
+    window.location.reload();
+}
+
+/**
+ * Makes an API call to add funds to the current user's balance.
+ */
+async function addFunds() {
+    const amount = parseFloat(document.getElementById('addFundsAmount').value);
+    if (isNaN(amount) || amount <= 0) return alert('נא להזין סכום תקין.');
+    try {
+        const res = await fetch('api.php?action=add_funds', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: currentUser.username, amount })
+        });
+        const result = await res.json();
+        if (result.status === 'success') {
+            currentUser.balance = result.newBalance;
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            document.getElementById('addFundsModal').style.display = 'none';
+            document.getElementById('addFundsAmount').value = '';
+            buildNav(); // Refresh navbar balance
+            alert(`הסכום התווסף! יתרה חדשה: ₪${result.newBalance}`);
+        } else if (result.message === 'max_exceeded') {
+            alert(`לא ניתן להוסיף סכום זה. ניתן להוסיף עוד עד ₪${result.allowed} (מגבלה: ₪10,000).`);
+        } else {
+            alert('שגיאה: ' + result.message);
+        }
+    } catch(e) {
+        alert('שגיאה בהוספת כסף: ' + e.message);
+    }
+}
+
+// ============================================================================
+// 3. UI BUILDERS (NAV, FOOTER, MODALS)
+// ============================================================================
 function buildNav() {
     const navContainer = document.getElementById('main-nav');
     if (!navContainer) return;
@@ -122,29 +218,8 @@ function buildNav() {
     `;
 }
 
-window.toggleMenu = function() {
+function toggleMenu() {
     document.getElementById("hamburgerMenu").classList.toggle("show");
-}
-
-window.changeStatusFilter = function(status) {
-    if (window.location.pathname.includes('markets.html')) {
-        let select = document.getElementById('statusFilter');
-        if (select) select.value = status;
-        
-        let url = new URL(window.location);
-        url.searchParams.set('status', status);
-        window.history.pushState({}, '', url);
-        
-        renderMarkets();
-    } else {
-        window.location.href = 'markets.html?status=' + status;
-    }
-}
-
-window.handleSearchInput = function() {
-    if (window.location.pathname.includes('markets.html')) {
-        renderMarkets();
-    }
 }
 
 function buildAuthModal() {
@@ -196,80 +271,6 @@ function buildAddFundsModal() {
     </div>`);
 }
 
-window.addFunds = async function() {
-    const amount = parseFloat(document.getElementById('addFundsAmount').value);
-    if (isNaN(amount) || amount <= 0) return alert('נא להזין סכום תקין.');
-    try {
-        const res = await fetch('api.php?action=add_funds', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: currentUser.username, amount })
-        });
-        const result = await res.json();
-        if (result.status === 'success') {
-            currentUser.balance = result.newBalance;
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            document.getElementById('addFundsModal').style.display = 'none';
-            document.getElementById('addFundsAmount').value = '';
-            buildNav();
-            alert(`הסכום התווסף! יתרה חדשה: ₪${result.newBalance}`);
-        } else if (result.message === 'max_exceeded') {
-            alert(`לא ניתן להוסיף סכום זה. ניתן להוסיף עוד עד ₪${result.allowed} (מגבלה: ₪10,000).`);
-        } else {
-            alert('שגיאה: ' + result.message);
-        }
-    } catch(e) {
-        alert('שגיאה בהוספת כסף: ' + e.message);
-    }
-}
-
-window.toggleAuthMode = function() {
-    authMode = authMode === 'login' ? 'register' : 'login';
-    document.getElementById('authTitle').innerText = authMode === 'login' ? 'התחברות למערכת' : 'הרשמה למערכת';
-    document.getElementById('registerFields').classList.toggle('hidden', authMode === 'login');
-    document.getElementById('authToggleText').innerText = authMode === 'login' ? 'משתמש חדש? לחץ כאן להרשמה' : 'משתמש רשום? לחץ כאן להתחברות';
-}
-
-window.handleAuth = async function(e) {
-    e.preventDefault();
-    let user = document.getElementById('authUser').value.trim();
-    let pass = document.getElementById('authPass').value.trim();
-    
-    if (authMode === 'login') {
-        let existing = appData.users.find(u => u.username === user);
-        if (existing) {
-            if (existing.password === pass) {
-                currentUser = existing;
-                localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                window.location.reload();
-            } else {
-                alert('סיסמה שגויה!');
-            }
-        } else {
-            alert('משתמש לא קיים. מעביר למצב הרשמה...');
-            toggleAuthMode();
-            document.getElementById('authUser').value = user;
-            document.getElementById('authPass').value = pass;
-        }
-    } else {
-        let existing = appData.users.find(u => u.username === user);
-        if(existing) return alert('שם משתמש כבר תפוס!');
-        let fullName = document.getElementById('authFullName').value.trim();
-        let newUser = { username: user, password: pass, fullName: fullName || user, balance: 0 };
-        appData.users.push(newUser);
-        currentUser = newUser;
-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
-        await saveData();
-        window.location.reload();
-    }
-}
-
-window.logout = function() {
-    localStorage.removeItem('currentUser');
-    window.location.reload();
-}
-
-// ================= Footer UI =================
 function buildFooter() {
     const footerContainer = document.getElementById('main-footer');
     if (!footerContainer) return;
@@ -289,7 +290,6 @@ function buildFooter() {
                 <a href="manage_bets.html">ניהול הימורים</a>
                 <a href="participants.html">משתתפים</a>
                 <a href="team.html">צוות האתר</a>
-                <a href="payout_calc.html">מחשבון זכיות</a>
                 <a href="contact.html">צור קשר</a>
                 <a href="table.php">טבלת הודעות (DB)</a>
             </div>
@@ -305,28 +305,14 @@ function buildFooter() {
     `;
 }
 
-window.submitContact = async function() {
-    let input = document.getElementById('footerInput');
-    let msg = input.value.trim();
-    if(!msg) return alert('נא להזין הודעה בטופס.');
-    
-    if(!appData.messages) appData.messages = [];
-    appData.messages.push({
-        id: 'msg_' + Date.now(),
-        username: currentUser ? currentUser.username : null,
-        message: msg,
-        timestamp: Date.now()
-    });
-    
-    await saveData();
-    input.value = '';
-    alert('תודה! קלטנו את ההודעה בהצלחה!');
-}
+// ============================================================================
+// 4. PAGE RENDERERS
+// ============================================================================
 
-// ================= Pages Logic =================
-
-// 1. Markets (Open Bets)
-window.renderMarkets = function() {
+/**
+ * Renders the main markets page (open & closed bets) with filters and search logic.
+ */
+function renderMarkets() {
     const container = document.getElementById('markets-container');
     if(!container) return;
     
@@ -420,43 +406,10 @@ window.renderMarkets = function() {
     container.innerHTML = html || '<p style="text-align:center; width:100%;">לא נמצאו התערבויות העונות לסינון.</p>';
 }
 
-window.joinBet = function(betId, option) {
-    localSelections[betId] = option;
-    renderMarkets();
-}
-
-window.lockBet = async function(betId) {
-    const option = localSelections[betId];
-    if (!option) return;
-    const bet = appData.bets.find(b => b.id === betId);
-    if (currentUser.balance < bet.amount) {
-        return alert(`אין מספיק כסף! היתרה שלך: ₪${currentUser.balance}. נדרש: ₪${bet.amount}. הוסף כסף דרך כפתור "+ הוסף כסף".`);
-    }
-    try {
-        const res = await fetch('api.php?action=lock_bet', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ betId, username: currentUser.username, option })
-        });
-        const result = await res.json();
-        if (result.status !== 'success') {
-            if (result.message === 'insufficient_funds') return alert('אין מספיק כסף בחשבון!');
-            throw new Error(result.message || 'שגיאת שרת');
-        }
-        delete localSelections[betId];
-        const fresh = await fetch('api.php');
-        appData = await fresh.json();
-        const updatedUser = appData.users.find(u => u.username === currentUser.username);
-        if (updatedUser) { currentUser = updatedUser; localStorage.setItem('currentUser', JSON.stringify(currentUser)); }
-        buildNav();
-    } catch(e) {
-        alert('שגיאה בנעילת הבחירה: ' + e.message);
-    }
-    renderMarkets();
-}
-
-// 2. Manage Bets
-window.renderManageBets = function() {
+/**
+ * Renders the "Manage Bets" page including bet creation, closing bets, and user history.
+ */
+function renderManageBets() {
     const catSelect = document.getElementById('categorySelect');
     const closedBetsContainer = document.getElementById('my-open-bets');
     if(!catSelect || !closedBetsContainer) return;
@@ -465,11 +418,9 @@ window.renderManageBets = function() {
                           appData.categories.map(c => `<option value="${c}">${c}</option>`).join('') +
                           '<option value="other">אחר (הזן טקסט)...</option>';
                           
-    // שימוש ב-onchange בטוח יותר כדי לתפוס את שינוי הקטגוריה
-    catSelect.onchange = window.checkCustomCat;
-    
-    // קריאה לפונקציה פעם אחת מיד בהתחלה כדי להכין את השדה המוסתר ב-DOM
-    window.checkCustomCat();
+    // Safe binding for the custom category addition prompt
+    catSelect.onchange = checkCustomCat;
+    checkCustomCat();
 
     if(!currentUser) {
         closedBetsContainer.innerHTML = '<p>עליך להתחבר כדי לנהל הימורים.</p>';
@@ -526,94 +477,10 @@ window.renderManageBets = function() {
     }
 }
 
-window.checkCustomCat = function() {
-    let select = document.getElementById('categorySelect');
-    if (!select) return;
-    
-    // שימוש ב-window.prompt להוספת קטגוריה חדשה בקלות
-    if (select.value === 'other') {
-        let newCat = window.prompt("הזן קטגוריה חדשה (למשל: אוכל, סרטים):");
-        if (newCat && newCat.trim() !== "") {
-            let opt = document.createElement('option');
-            opt.value = newCat.trim();
-            opt.text = newCat.trim();
-            select.insertBefore(opt, select.lastElementChild); // מוסיף לפני בחירת ה"אחר"
-            select.value = newCat.trim();
-        } else {
-            select.value = ""; // איפוס בחירה אם בוטל
-        }
-    }
-}
-
-window.createBet = async function(e) {
-    e.preventDefault();
-    if(!currentUser) return alert('יש להתחבר!');
-    let title = document.getElementById('betTitle').value;
-    let amount = parseInt(document.getElementById('betAmount').value);
-    let cat = document.getElementById('categorySelect').value;
-
-    let opt1 = document.getElementById('betOption1').value.trim();
-    let opt2 = document.getElementById('betOption2').value.trim();
-    let opts = [opt1, opt2].filter(o => o);
-
-    let newBet = {
-        id: 'bet_' + Date.now(), title, amount, category: cat, creator: currentUser.username, status: 'open',
-        options: opts, participants: {}, winningOption: null
-    };
-
-    try {
-        const res = await fetch('api.php?action=create_bet', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newBet)
-        });
-        if (!res.ok) throw new Error((await res.json()).message || 'שגיאת שרת');
-        const fresh = await fetch('api.php');
-        appData = await fresh.json();
-        alert('התערבות נוצרה בהצלחה!');
-        e.target.reset();
-        window.checkCustomCat();
-        renderManageBets();
-    } catch(e) {
-        alert('שגיאה ביצירת ההימור: ' + e.message);
-    }
-}
-
-window.closeBet = function(betId) {
-    const bet = appData.bets.find(b => b.id === betId);
-    const modal = document.getElementById('closeBetModal');
-    document.getElementById('closeBetTitle').textContent = bet.title;
-    const optionsDiv = document.getElementById('closeBetOptions');
-    optionsDiv.innerHTML = bet.options.map(opt =>
-        `<button class="auth-btn" style="flex:1; padding:10px;" onclick="confirmCloseBet('${betId}', '${opt.replace(/'/g, "\\'")}')">${opt}</button>`
-    ).join('');
-    modal.style.display = 'flex';
-}
-
-window.confirmCloseBet = async function(betId, winningOption) {
-    document.getElementById('closeBetModal').style.display = 'none';
-    try {
-        const res = await fetch('api.php?action=close_bet', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ betId, winningOption })
-        });
-        const closeResult = await res.json();
-        if (closeResult.status !== 'success') throw new Error(closeResult.message || 'שגיאת שרת');
-        const fresh = await fetch('api.php');
-        appData = await fresh.json();
-        const updatedUser = appData.users.find(u => u.username === currentUser.username);
-        if (updatedUser) { currentUser = updatedUser; localStorage.setItem('currentUser', JSON.stringify(currentUser)); }
-        buildNav();
-        renderManageBets();
-        alert('התערבות נסגרה בהצלחה! הזכיות זוכו אוטומטית.');
-    } catch(e) {
-        alert('שגיאה בסגירת ההימור: ' + e.message);
-    }
-}
-
-// 3. Ledger (Participants)
-window.renderLedger = async function() {
+/**
+ * Fetches and displays the leaderboard sorted by net winnings.
+ */
+async function renderLedger() {
     const container = document.getElementById('ledger-container');
     if (!container) return;
 
@@ -641,9 +508,7 @@ window.renderLedger = async function() {
     }).join('');
 }
 
-
-// 4. Contact / Admins
-window.renderContact = function() {
+function renderContact() {
     const container = document.getElementById('admins-container');
     if(container) {
         container.innerHTML = appData.admins.map(admin => `
@@ -657,7 +522,6 @@ window.renderContact = function() {
     }
 }
 
-// 6. Team Page
 function renderTeamPage() {
     const container = document.getElementById('team-container');
     if(container) {
@@ -672,17 +536,182 @@ function renderTeamPage() {
     }
 }
 
-// 7. Payout Calculator
-function preparePayoutCalc() {
-    // This function is mostly a placeholder in case of future setup needs.
-    // The actual calculation is bound to the button's onclick event.
+// ============================================================================
+// 5. BETTING ACTIONS (JOIN, LOCK, CREATE, CLOSE)
+// ============================================================================
+function changeStatusFilter(status) {
+    if (window.location.pathname.includes('markets.html')) {
+        let select = document.getElementById('statusFilter');
+        if (select) select.value = status;
+        
+        let url = new URL(window.location);
+        url.searchParams.set('status', status);
+        window.history.pushState({}, '', url);
+        
+        renderMarkets();
+    } else {
+        window.location.href = 'markets.html?status=' + status;
+    }
 }
 
-window.calculatePayout = function() {
-    let poolAmount = parseFloat(document.getElementById('pool_amount').value);
-    if (isNaN(poolAmount)) return;
+function handleSearchInput() {
+    if (window.location.pathname.includes('markets.html')) {
+        renderMarkets();
+    }
+}
 
-    const netAmount = poolAmount * 0.9; // Simplified calculation
+function joinBet(betId, option) {
+    // Updates UI locally to show selection before making DB call
+    localSelections[betId] = option;
+    renderMarkets();
+}
+
+/**
+ * Locks the user's selected option for a specific bet.
+ * Deducts the bet amount from the user's balance via the API.
+ */
+async function lockBet(betId) {
+    const option = localSelections[betId];
+    if (!option) return;
+    const bet = appData.bets.find(b => b.id === betId);
     
-    document.getElementById('calcResult').innerText = `סכום הזכייה נטו לאחר עמלות הוא: ${netAmount.toFixed(2)} ₪`;
+    if (currentUser.balance < bet.amount) {
+        return alert(`אין מספיק כסף! היתרה שלך: ₪${currentUser.balance}. נדרש: ₪${bet.amount}. הוסף כסף דרך כפתור "+ הוסף כסף".`);
+    }
+    
+    try {
+        const res = await fetch('api.php?action=lock_bet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ betId, username: currentUser.username, option })
+        });
+        const result = await res.json();
+        if (result.status !== 'success') {
+            if (result.message === 'insufficient_funds') return alert('אין מספיק כסף בחשבון!');
+            throw new Error(result.message || 'שגיאת שרת');
+        }
+        delete localSelections[betId];
+        
+        // Fetch fresh state to update the UI
+        const fresh = await fetch('api.php');
+        appData = await fresh.json();
+        const updatedUser = appData.users.find(u => u.username === currentUser.username);
+        if (updatedUser) { currentUser = updatedUser; localStorage.setItem('currentUser', JSON.stringify(currentUser)); }
+        
+        buildNav();
+        renderMarkets();
+    } catch(e) {
+        alert('שגיאה בנעילת הבחירה: ' + e.message);
+    }
+}
+
+function checkCustomCat() {
+    let select = document.getElementById('categorySelect');
+    if (!select) return;
+    
+    if (select.value === 'other') {
+        let newCat = window.prompt("הזן קטגוריה חדשה (למשל: אוכל, סרטים):");
+        if (newCat && newCat.trim() !== "") {
+            let opt = document.createElement('option');
+            opt.value = newCat.trim();
+            opt.text = newCat.trim();
+            select.insertBefore(opt, select.lastElementChild);
+            select.value = newCat.trim();
+        } else {
+            select.value = "";
+        }
+    }
+}
+
+async function createBet(e) {
+    e.preventDefault();
+    if(!currentUser) return alert('יש להתחבר!');
+    let title = document.getElementById('betTitle').value;
+    let amount = parseInt(document.getElementById('betAmount').value);
+    let cat = document.getElementById('categorySelect').value;
+
+    let opt1 = document.getElementById('betOption1').value.trim();
+    let opt2 = document.getElementById('betOption2').value.trim();
+    let opts = [opt1, opt2].filter(o => o);
+
+    let newBet = {
+        id: 'bet_' + Date.now(), title, amount, category: cat, creator: currentUser.username, status: 'open',
+        options: opts, participants: {}, winningOption: null
+    };
+
+    try {
+        const res = await fetch('api.php?action=create_bet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newBet)
+        });
+        if (!res.ok) throw new Error((await res.json()).message || 'שגיאת שרת');
+        
+        // Fetch fresh state to update the UI
+        const fresh = await fetch('api.php');
+        appData = await fresh.json();
+        alert('התערבות נוצרה בהצלחה!');
+        e.target.reset();
+        checkCustomCat();
+        renderManageBets();
+    } catch(e) {
+        alert('שגיאה ביצירת ההימור: ' + e.message);
+    }
+}
+
+function closeBet(betId) {
+    const bet = appData.bets.find(b => b.id === betId);
+    const modal = document.getElementById('closeBetModal');
+    document.getElementById('closeBetTitle').textContent = bet.title;
+    const optionsDiv = document.getElementById('closeBetOptions');
+    optionsDiv.innerHTML = bet.options.map(opt =>
+        `<button class="auth-btn" style="flex:1; padding:10px;" onclick="confirmCloseBet('${betId}', '${opt.replace(/'/g, "\\'")}')">${opt}</button>`
+    ).join('');
+    modal.style.display = 'flex';
+}
+
+async function confirmCloseBet(betId, winningOption) {
+    document.getElementById('closeBetModal').style.display = 'none';
+    try {
+        const res = await fetch('api.php?action=close_bet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ betId, winningOption })
+        });
+        const closeResult = await res.json();
+        if (closeResult.status !== 'success') throw new Error(closeResult.message || 'שגיאת שרת');
+        
+        // Fetch fresh state to update the UI
+        const fresh = await fetch('api.php');
+        appData = await fresh.json();
+        const updatedUser = appData.users.find(u => u.username === currentUser.username);
+        if (updatedUser) { currentUser = updatedUser; localStorage.setItem('currentUser', JSON.stringify(currentUser)); }
+        
+        buildNav();
+        renderManageBets();
+        alert('התערבות נסגרה בהצלחה! הזכיות זוכו אוטומטית.');
+    } catch(e) {
+        alert('שגיאה בסגירת ההימור: ' + e.message);
+    }
+}
+
+// ============================================================================
+// 6. UTILITIES (CONTACT, PAYOUT CALCULATOR)
+// ============================================================================
+async function submitContact() {
+    let input = document.getElementById('footerInput');
+    let msg = input.value.trim();
+    if(!msg) return alert('נא להזין הודעה בטופס.');
+    
+    if(!appData.messages) appData.messages = [];
+    appData.messages.push({
+        id: 'msg_' + Date.now(),
+        username: currentUser ? currentUser.username : null,
+        message: msg,
+        timestamp: Date.now()
+    });
+    
+    await saveData();
+    input.value = '';
+    alert('תודה! קלטנו את ההודעה בהצלחה!');
 }

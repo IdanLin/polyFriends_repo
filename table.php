@@ -1,25 +1,36 @@
 <?php
-$host = 'sql100.byethost31.com';
-$db   = 'b31_41617640_my_polyfriends_db';
-$user = 'b31_41617640'; 
-$pass = 'gt#Q#P!9RAm76j9'; 
-$charset = 'utf8mb4';
+// Set default timezone to Israel
+date_default_timezone_set('Asia/Jerusalem');
 
-$dsn = "mysql:host=$host;dbname=$db;charset=$charset";
-$options = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-];
+// Database connection settings (MySQLi)
+$servername = "sql100.byethost31.com";
+$username = "b31_41617640";
+$password = "gt#Q#P!9RAm76j9";
+$dbname = "b31_41617640_my_polyfriends_db";
 
-try {
-    $pdo = new PDO($dsn, $user, $pass, $options);
-} catch (\PDOException $e) {
-    die('שגיאה בחיבור למסד הנתונים: ' . $e->getMessage());
+// Create connection
+$conn = new mysqli($servername, $username, $password, $dbname);
+
+// Set charset to support Hebrew properly
+$conn->set_charset("utf8mb4");
+
+// Check connection
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
 }
 
-$stmt = $pdo->query("SELECT id, username, message, timestamp FROM contact_messages ORDER BY timestamp DESC");
-$messages = $stmt->fetchAll();
+// Fetch all messages from contact_messages table, ordered from newest to oldest
+$sql = "SELECT id, username, message, timestamp FROM contact_messages ORDER BY timestamp DESC";
+$result = $conn->query($sql);
 
+$messages = [];
+if ($result && $result->num_rows > 0) {
+    while($row = $result->fetch_assoc()) {
+        $messages[] = $row;
+    }
+}
+
+// Function to count total messages (implements "use a loop" project requirement)
 function countTotalMessages($msgsArray) {
     $count = 0;
     foreach ($msgsArray as $item) {
@@ -28,11 +39,14 @@ function countTotalMessages($msgsArray) {
     return $count;
 }
 
+// Function to generate a dynamic title (implements "use string function" requirement via str_replace)
 function generateCustomTitle($msgsArray) {
     $count = countTotalMessages($msgsArray);
     $baseString = "סה\"כ הודעות שנקלטו במערכת: {NUMBER}";
     return str_replace("{NUMBER}", $count, $baseString);
 }
+
+// Call the function and save the formatted title to display later on the page
 $formattedTitle = generateCustomTitle($messages);
 
 ?>
@@ -48,14 +62,14 @@ $formattedTitle = generateCustomTitle($messages);
 <body>
     <nav id="main-nav"></nav>
     <div class="info-section">
-        <h2 class="info-heading" style="text-align: center;">הודעות שהתקבלו מטופס צור קשר</h2>
+        <h2 class="info-heading">הודעות שהתקבלו מטופס צור קשר</h2>
         
-        <div style="text-align: center; margin-bottom: 25px;">
-            <span class="balance-badge balance-positive" style="font-size: 1.1em;"><?php echo $formattedTitle; ?></span>
+        <div class="filter-container">
+            <span class="balance-badge balance-positive"><?php echo $formattedTitle; ?></span>
         </div>
 
-        <div class="market-card" style="margin: 0 auto; overflow-x: auto;">
-            <table class="features-table" style="margin: 0; width: 100%;">
+        <div class="market-card" style="overflow-x: auto;">
+            <table class="features-table">
             <tr>
                 <th>מזהה (ID)</th>
                 <th>שם משתמש</th>

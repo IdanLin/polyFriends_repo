@@ -81,3 +81,4 @@
 | \*\*PHP \& MySQL\*\* | \*\*In Form 3:\*\* Use at least one string function | | **on "table.php" -> function generateCustomTitle($msgsArray)**
 
 | \*\*PHP \& MySQL\*\* | \*\*In Form 3:\*\* Use at least one mathematical operation | **on "table.php" -> function countTotalMessages($msgsArray) -> counter**
+

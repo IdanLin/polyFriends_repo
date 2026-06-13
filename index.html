@@ -10,7 +10,7 @@
 <body>
     <nav id="main-nav"></nav>
 
-    <div class="hero-section">
+    <div class="hero-section" style="background-image: url('images/hero-bg.jpg');">
         <h1>זירת ההימורים לחברים בלבד</h1>
     </div>
     
@@ -87,10 +87,7 @@
     <footer id="main-footer"></footer>
 
     <script>
-        document.write("<p style='text-align:center; font-size:13px; color:#888; padding-bottom: 20px; margin: 0; background-color: #2c3e50;'>הדף נטען בתאריך: " + new Date().toLocaleString() + "</p>");
-    </script>
-
-    <script>
+        //Accordion Script - When someone clicks on an accordion item
         function toggleAccordion(element) {
             const container = element.parentElement;
             const cards = container.children;
